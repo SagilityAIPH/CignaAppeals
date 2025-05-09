@@ -1,0 +1,81 @@
+
+.sidebar {
+  position: fixed;
+  top: 60px; /* matches header height */
+  left: 0;
+  width: 270px;
+  height: calc(100% - 60px);
+  background-color: #131B30; /* darker Cigna blue */
+  padding-top: 20px;
+  z-index: 1000;
+}
+
+.sidebar .nav-item {
+  margin-bottom: 15px;
+  padding: 0 10px;
+}
+
+.sidebar .nav-link {
+  color: white;
+  font-weight: 500;
+  padding: 12px 20px;
+  user-select: none; /* removes I-beam/text selection */
+}
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  background-color: #005eb8;
+  border-left: 4px solid #00b0ca;
+}
+
+.main-content {
+  margin-left: 250px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  min-height: calc(100vh - 60px);
+}
+
+.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-logo img {
+  max-height: 40px;
+}
+
+.sidebar-btn {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-btn.active {
+  background-color: #0071ce !important;
+  color: #fff !important;
+}
+
+.sidebar-btn:hover {
+  background-color: #0a53be;
+}
+
+
+.uploader {
+  background-color: white;
+  padding-top: 3rem;
+  margin-top: 2rem;
+  margin-left: 1rem;
+}
+
+.dashboard {
+  background-color: white;
+  padding-top: 3rem;
+  margin-top: 2rem;
+  margin-left: 1rem;
+}
+
+.table {
+  background-color: black;
+  padding-top: 3rem;
+  margin-top: 2rem;
+  margin-left: 1rem;
+}
+
