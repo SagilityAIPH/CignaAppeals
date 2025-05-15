@@ -13,6 +13,9 @@ import {
   Tooltip,
   CartesianGrid,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  Legend,
 } from "recharts";
 
 function AppealStatusOverview() {
@@ -27,6 +30,7 @@ function AppealStatusOverview() {
   const [directorCounts, setDirectorCounts] = useState(null);
   const [multiLineData, setMultiLineData] = useState([]);
   const [filteredDirector, setFilteredDirector] = useState(null);
+  const [enterpriseSummary, setEnterpriseSummary] = useState([]);
 
   useEffect(() => {
     if (selectedDate) calculateCardMetrics(selectedDate);
@@ -97,6 +101,12 @@ function AppealStatusOverview() {
             Wipro: 0,
           };
 
+          const summary = {
+            Sagility: { fresh: 0, untouched: 0, closed: 0 },
+            Concentrix: { fresh: 0, untouched: 0, closed: 0 },
+            Wipro: { fresh: 0, untouched: 0, closed: 0 },
+          };
+
           const groupedByDate = {};
 
           json.forEach((row) => {
@@ -107,6 +117,14 @@ function AppealStatusOverview() {
             if (director === "Sagility") counts.Sagility++;
             else if (director === "Concentrix") counts.Concentrix++;
             else if (director === "Wipro") counts.Wipro++;
+
+            if (!summary[director]) return;
+            summary[director].fresh += 1;
+            if (status === "Open" || status === "Assigned") {
+              summary[director].untouched += 1;
+            } else if (status === "Completed") {
+              summary[director].closed += 1;
+            }
 
             let parsedDate;
             if (typeof reportDateRaw === "number") {
@@ -138,7 +156,6 @@ function AppealStatusOverview() {
               record.closed += 1;
             }
 
-            // Track by director
             if (!record.details[director]) {
               record.details[director] = { fresh: 0, untouched: 0, closed: 0 };
             }
@@ -156,6 +173,15 @@ function AppealStatusOverview() {
 
           setDirectorCounts(counts);
           setMultiLineData(resultArray);
+
+          const barData = Object.keys(summary).map((key) => ({
+            enterprise: key,
+            fresh: summary[key].fresh,
+            untouched: summary[key].untouched,
+            closed: summary[key].closed,
+          }));
+
+          setEnterpriseSummary(barData);
 
           const latestDate = resultArray[resultArray.length - 1]?.date;
           setSelectedDate(latestDate);
@@ -223,56 +249,154 @@ function AppealStatusOverview() {
       </div>
 
       {uploadProgress === 100 && multiLineData.length > 0 && (
-        <div className="p-4" style={{ display: 'flex', gap: '32px', marginLeft: '-245px', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {[
-              { title: "Sagility", count: directorCounts?.Sagility || 0, bg: "#e3f2fd", color: "#1976d2" },
-              { title: "Concentrix", count: directorCounts?.Concentrix || 0, bg: "#e8f5e9", color: "#388e3c" },
-              { title: "Wipro", count: directorCounts?.Wipro || 0, bg: "#fff3e0", color: "#f57c00" },
+  <div className="p-4" style={{ display: 'flex', gap: '32px', marginLeft: '-245px', marginBottom: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {["Sagility", "Concentrix", "Wipro"].map((title, idx) => (
+        <div
+          key={idx}
+          onClick={() => setFilteredDirector(title)}
+          style={{
+            background: title === "Sagility" ? "#e3f2fd" : title === "Concentrix" ? "#e8f5e9" : "#fff3e0",
+            borderRadius: "12px",
+            padding: "16px",
+            width: "200px",
+            height: '80px',
+            marginBottom: '20px',
+            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}
+        >
+          <div style={{ fontSize: "16px", color: "#333" }}>{title}</div>
+          <div style={{ fontSize: "24px", color: title === "Sagility" ? "#1976d2" : title === "Concentrix" ? "#388e3c" : "#f57c00" }}>
+            {directorCounts?.[title] || 0}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div style={{ flexGrow: 1 }}>
+      <h5 style={{ fontWeight: "600", color: "#333", marginBottom: "10px" }}>Trend Overview{filteredDirector ? ` – ${filteredDirector}` : ""}</h5>
+      <ResponsiveContainer width="80%" height={300}>
+        <LineChart data={displayedData} style={{ fontWeight: "600" }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" tick={{ fill: '#333', fontWeight: 'bold', fontSize: 12 }} />
+          <YAxis tick={{ fill: "#333", fontWeight: "bold", fontSize: 12 }} domain={['auto', 'auto']} />
+          <Tooltip />
+          <Line type="monotone" dataKey="fresh" stroke="#00bcd4" strokeWidth={2} name="Fresh Claims" />
+          <Line type="monotone" dataKey="untouched" stroke="#fbc02d" strokeWidth={2} name="Untouched" />
+          <Line type="monotone" dataKey="closed" stroke="#4caf50" strokeWidth={2} name="Closed" />
+        </LineChart>
+      </ResponsiveContainer>
+
+      {/* Cards for Bar Summary */}
+      {enterpriseSummary.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'start', gap: '20px', marginTop: '30px', marginBottom: '10px' }}>
+          {(() => {
+            const totalFresh = enterpriseSummary.reduce((acc, e) => acc + e.fresh, 0);
+            const totalUntouched = enterpriseSummary.reduce((acc, e) => acc + e.untouched, 0);
+            const totalClosed = enterpriseSummary.reduce((acc, e) => acc + e.closed, 0);
+            const total = totalFresh + totalUntouched + totalClosed;
+
+            return [
+              { label: "Fresh Claims", value: totalFresh, color: "#00bcd4" },
+              { label: "Untouched", value: totalUntouched, color: "#fbc02d" },
+              { label: "Closed", value: totalClosed, color: "#4caf50" },
             ].map((item, idx) => (
               <div
                 key={idx}
-                onClick={() => setFilteredDirector(item.title)}
                 style={{
-                  background: item.bg,
-                  borderRadius: "12px",
+                  background: "#f9f9f9",
                   padding: "16px",
+                  borderRadius: "12px",
                   width: "200px",
-                  height:'80px',
-                  marginBottom: '20px',
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  fontWeight: "bold",
-                  cursor: "pointer"
+                  textAlign: "center",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.05)"
                 }}
               >
-                <div style={{ fontSize: "16px", color: "#333" }}>{item.title}</div>
-                <div style={{ fontSize: "24px", color: item.color }}>{item.count}</div>
+                <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '6px' }}>{item.label}</div>
+                <div style={{ fontSize: '28px', color: item.color }}>{item.value}</div>
+                <div style={{ fontSize: '13px', color: '#777' }}>{Math.round((item.value / total) * 100)}%</div>
               </div>
-            ))}
-          </div>
-          <div style={{ flexGrow: 1 }}>
-            <h5 style={{ fontWeight: "600", color: "#333", marginBottom: "10px" }}>Trend Overview{filteredDirector ? ` – ${filteredDirector}` : ""}</h5>
-            <ResponsiveContainer width="80%" height={300}>
-              <LineChart data={displayedData} style={{ fontWeight: "600" }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: '#333', fontWeight: 'bold', fontSize: 12 }}
-                />
-                <YAxis tick={{ fill: "#333", fontWeight: "bold", fontSize: 12 }} domain={['auto', 'auto']} />
-                <Tooltip />
-                <Line type="monotone" dataKey="fresh" stroke="#00bcd4" strokeWidth={2} name="Fresh Claims" />
-                <Line type="monotone" dataKey="untouched" stroke="#fbc02d" strokeWidth={2} name="Untouched" />
-                <Line type="monotone" dataKey="closed" stroke="#4caf50" strokeWidth={2} name="Closed" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          
+            ));
+          })()}
         </div>
       )}
+
+      {/* Bar Chart */}
+      <h5 style={{ fontWeight: "600", color: "#333", marginTop: "20px", marginBottom: "10px" }}>Enterprise Summary</h5>
+      <ResponsiveContainer width="80%" height={300}>
+        <BarChart data={enterpriseSummary}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="enterprise" tick={{ fontWeight: 'bold' }} />
+          <YAxis tick={{ fontWeight: 'bold' }} />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="fresh" fill="#00bcd4" name="Fresh Claims" />
+          <Bar dataKey="untouched" fill="#fbc02d" name="Untouched" />
+          <Bar dataKey="closed" fill="#4caf50" name="Closed" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+        
+      )}
+      
+{uploadProgress === 100 && enterpriseSummary.length > 0 && multiLineData.length > 0 && (
+  <div className="px-4" style={{ marginLeft: '-245px', marginBottom: '40px' }}>
+    <h5 style={{ fontWeight: "600", color: "#333", marginBottom: "15px" }}>Enterprise Table Summary</h5>
+
+    <div style={{ marginBottom: '20px' }}>
+      <label style={{ marginRight: '10px', fontWeight: 'bold' }}>Filter by Date:</label>
+      <select
+        onChange={(e) => setSelectedDate(e.target.value)}
+        value={selectedDate || ''}
+        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+      >
+        <option value="">-- All Dates --</option>
+        {[...new Set(multiLineData.map(d => d.date))].map((date, idx) => (
+          <option key={idx} value={date}>{date}</option>
+        ))}
+      </select>
+    </div>
+
+    <table className="table" style={{ width: '80%', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+      <thead style={{ background: '#f1f1f1', fontWeight: 'bold', color: '#333' }}>
+        <tr>
+          <th>Enterprise</th>
+          <th>Fresh Claims</th>
+          <th>Untouched</th>
+          <th>Closed</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {["Sagility", "Concentrix", "Wipro"].map((enterprise, idx) => {
+          const summary = multiLineData
+            .filter(d => !selectedDate || d.date === selectedDate)
+            .map(d => d.details?.[enterprise] || { fresh: 0, untouched: 0, closed: 0 });
+
+          const fresh = summary.reduce((acc, cur) => acc + cur.fresh, 0);
+          const untouched = summary.reduce((acc, cur) => acc + cur.untouched, 0);
+          const closed = summary.reduce((acc, cur) => acc + cur.closed, 0);
+
+          return (
+            <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f9f9f9' }}>
+              <td>{enterprise}</td>
+              <td>{fresh}</td>
+              <td>{untouched}</td>
+              <td>{closed}</td>
+              <td><strong>{fresh + untouched + closed}</strong></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+)}
     </HomePage>
   );
 }
