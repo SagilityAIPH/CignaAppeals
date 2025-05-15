@@ -1,10 +1,13 @@
 // Layout.js
 import React from "react";
 import { MdDashboard } from "react-icons/md";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
-function HomePage({ active, setActive, children }) {
+function HomePage({ children }) {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (path) => location.pathname === path;
 
   return (
     <>
@@ -46,18 +49,18 @@ function HomePage({ active, setActive, children }) {
       <div className="sidebar">
         <ul className="nav flex-column mt-4">
           {/* Appeal Command Center */}
-          <li className="nav-item mb-3 px-2">
+          <li className="nav-item mb-2 px-2">
             <button
               className={`btn w-100 d-flex align-items-center sidebar-btn ${
-                active === "appeal" ? "active" : ""
+                isActive("/appeal-command-center") ? "active" : ""
               }`}
               onClick={() => {
-                setActive("appeal");
-                navigate("/");
+                if (!isActive("/appeal-command-center")) navigate("/appeal-command-center");
               }}
               style={{
-                padding: "10px 15px",
+                padding: "10px",
                 fontWeight: 500,
+                fontSize: '13px',
                 border: "none",
                 backgroundColor: "transparent",
                 color: "white",
@@ -67,25 +70,25 @@ function HomePage({ active, setActive, children }) {
               }}
             >
               <MdDashboard
-                style={{ marginRight: "10px", fontSize: "20px", flexShrink: 0 }}
+                style={{ marginRight: "0px", fontSize: "20px", flexShrink: 0 }}
               />
               <span style={{ flexGrow: 1 }}>Appeal Command Center</span>
             </button>
           </li>
 
           {/* Appeal Status Overview */}
-          <li className="nav-item mb-3 px-2">
+          <li className="nav-item mb-2 px-2">
             <button
               className={`btn w-100 d-flex align-items-center sidebar-btn ${
-                active === "appealStatus" ? "active" : ""
+                isActive("/appeal-status-overview") ? "active" : ""
               }`}
               onClick={() => {
-                setActive("appealStatus");
-                navigate("/appeal-status");
+                if (!isActive("/appeal-status-overview")) navigate("/appeal-status-overview");
               }}
               style={{
-                padding: "10px 15px",
+                padding: "10px",
                 fontWeight: 500,
+                fontSize: '13px',
                 border: "none",
                 backgroundColor: "transparent",
                 color: "white",
@@ -95,7 +98,7 @@ function HomePage({ active, setActive, children }) {
               }}
             >
               <MdDashboard
-                style={{ marginRight: "10px", fontSize: "20px", flexShrink: 0 }}
+                style={{ marginRight: "-10px", fontSize: "20px", flexShrink: 0 }}
               />
               <span style={{ flexGrow: 1 }}>Appeal Status Overview</span>
             </button>

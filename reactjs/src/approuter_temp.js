@@ -1,18 +1,37 @@
 // AppRouter.js
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import HomePage from "./HomePage";
 import AppealCommandCenter from "./AppealCommandCenter";
 import AppealStatusOverview from "./AppealStatusOverview";
 
-function approuter_temp() {
+function AppRouter() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<AppealCommandCenter  />} />
-        <Route path="/appeal-status" element={<AppealStatusOverview />} />
+        {/* Redirect base path to /appeal-command-center */}
+        <Route path="/" element={<Navigate to="/appeal-command-center" replace />} />
+
+        {/* Routes wrapped with HomePage layout */}
+        <Route
+          path="/appeal-command-center"
+          element={
+            <HomePage>
+              <AppealCommandCenter />
+            </HomePage>
+          }
+        />
+        <Route
+          path="/appeal-status-overview"
+          element={
+            <HomePage>
+              <AppealStatusOverview />
+            </HomePage>
+          }
+        />
       </Routes>
     </Router>
   );
 }
 
-export default approuter_temp;
+export default AppRouter;
