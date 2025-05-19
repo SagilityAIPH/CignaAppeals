@@ -10,6 +10,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
 import HomePage from "./HomePage";
 import { Form, Button, ProgressBar, Table, Modal } from "react-bootstrap";
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const AGE_BUCKETS = [
   "0-14", "15-29", "30-44", "45-59", "60-89", "90-179", "180-364", "365+"
@@ -158,26 +159,79 @@ function AppealCommandCenter() {
            <div className="p-4 rounded shadow-sm bg-white border mb-4">
               <div className="row">
                 <div className="col-md-3">
-                  <div className="p-3 border rounded bg-light h-100">
-                    <h6 className="mb-3 text-primary text-center">Case Summary</h6>
-                    <div className="mb-2 d-flex justify-content-between" style={{ fontWeight: "500", marginTop:'20px' }}>
-                      <span>Total Cases:</span>
-                      <strong>{fullData.length}</strong>
+                  <div className="p-3 border rounded bg-white h-100 shadow-sm">
+                    <h6 className="mb-4 text-center text-primary fw-bold">Case Summary</h6>
+
+                    <div className="d-flex align-items-center mb-3">
+                      <i className="bi bi-folder-fill text-secondary fs-4 me-3"></i>
+                      <div>
+                        <small>Total Cases</small>
+                        <h5 className="mb-0">
+                          {fullData.filter(row => (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari").length}
+                        </h5>
+                      </div>
                     </div>
-                    <div className="mb-2 d-flex justify-content-between text-primary" style={{ fontWeight: "500" }}>
-                      <span>Open / Untouched:</span>
-                      <strong>
-                        {fullData.filter(row => row.Status?.toString().trim().toLowerCase() !== "completed").length}
-                      </strong>
+
+                    <div className="d-flex align-items-center mb-3">
+                      <i className="bi bi-hourglass-split text-primary fs-4 me-3"></i>
+                      <div>
+                        
+                        <small>Open / Untouched</small>
+                          <h5 className="mb-0 text-primary">
+                            {fullData.filter(
+                              row =>
+                                (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari" &&
+                                row.Status?.toString().trim().toLowerCase() !== "completed"
+                            ).length}
+                          </h5>
+                      </div>
                     </div>
-                    <div className="d-flex justify-content-between text-success" style={{ fontWeight: "500" }}>
-                      <span>Completed:</span>
-                      <strong>
-                        {fullData.filter(row => row.Status?.toString().trim().toLowerCase() === "completed").length}
-                      </strong>
+
+                    <div className="d-flex align-items-center mb-3">
+                      <i className="bi bi-check-circle-fill text-success fs-4 me-3"></i>
+                      <div>
+                      <small>Completed</small>
+                        <h5 className="mb-0 text-success">
+                          {fullData.filter(
+                            row =>
+                              (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari" &&
+                              row.Status?.toString().trim().toLowerCase() === "completed"
+                          ).length}
+                        </h5>
+                      </div>
                     </div>
+
+                    <hr />
+                    <small className="text-muted">Completion Rate</small>
+                    <ProgressBar
+                        now={
+                          Math.round(
+                            (fullData.filter(
+                              row =>
+                                (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari" &&
+                                row.Status?.toString().trim().toLowerCase() === "completed"
+                            ).length /
+                              fullData.filter(
+                                row => (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari"
+                              ).length) * 100
+                          )
+                        }
+                        striped
+                        variant="success"
+                        label={`${Math.round(
+                          (fullData.filter(
+                            row =>
+                              (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari" &&
+                              row.Status?.toString().trim().toLowerCase() === "completed"
+                          ).length /
+                            fullData.filter(
+                              row => (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari"
+                            ).length) * 100
+                        )}%`}
+                      />
                   </div>
                 </div>
+
 
                 <div className="col-md-9 mt-3 mt-md-0">
                   <div className="p-3 border rounded bg-light">
@@ -316,15 +370,10 @@ function AppealCommandCenter() {
                     </tr>
                   </thead>
                   <tbody>
-                    {currentRows.map((row, index) => (
-                      <tr
-                        key={index}
-                        className={
-                            row.Status?.toString().trim().toLowerCase() === "completed"
-                              ? "table-success"
-                              : ""
-                          }
-                      >
+                      {currentRows
+                        .filter((row) => (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari")
+                        .map((row, index) => (
+                      <tr key={index} className={row.Status?.toString().trim().toLowerCase() === "completed" ? "table-success" : ""}>
                         <td>
                           <Form.Check
                             type="checkbox"
@@ -436,17 +485,41 @@ function AppealCommandCenter() {
             style={{ fontWeight: "bold", width: "20%" }}
               variant="danger"
               onClick={() => {
-                const updated = fullData.map((row) =>
-                  selectedRows.includes(row)
-                    ? { ...row, Status: "Completed" }
-                    : row
-                );
-                setFullData(updated);
-                setFilteredData(updated);
-                setSelectedRows([]);
-                setShowConfirmModal(false);
-                toast.success("Selected cases completed successfully.");
-              }}
+                    const updated = fullData.map((row) =>
+                      selectedRows.includes(row)
+                        ? { ...row, Status: "Completed" }
+                        : row
+                    );
+
+                    setFullData(updated);
+
+                    // re-filter based on current status filter
+                    let newFiltered = updated;
+
+                    if (statusFilter === "Open") {
+                      newFiltered = updated.filter(
+                        row =>
+                          (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari" &&
+                          row.Status?.toString().trim().toLowerCase() !== "completed"
+                      );
+                    } else if (statusFilter === "Completed") {
+                      newFiltered = updated.filter(
+                        row =>
+                          (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari" &&
+                          row.Status?.toString().trim().toLowerCase() === "completed"
+                      );
+                    } else {
+                      newFiltered = updated.filter(
+                        row => (row["Manager"] || row["D"])?.toString().trim().toLowerCase() === "tiwari"
+                      );
+                    }
+
+                    setFilteredData(newFiltered);
+                    setSelectedRows([]);
+                    setShowConfirmModal(false);
+                    toast.success("Selected cases completed successfully.");
+                  }}
+
             >
               Yes
             </Button>
