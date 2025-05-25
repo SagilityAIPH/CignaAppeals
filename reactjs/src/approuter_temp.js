@@ -1,34 +1,31 @@
-// AppRouter.js
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import HomePage from "./HomePage";
-import AppealCommandCenter from "./AppealCommandCenter";
-import AppealStatusOverview from "./AppealStatusOverview";
+// App.js
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import LoginPage from './LoginPage';
+import ClientPage from './ClientPage';
+import ExecutiveSummary from './ClientExecutiveSummary';
+import FacetsPage from './ClientFacetsPage';
+import ProclaimPage from './ClientProclaimPage';
+import TeamLeadPage from './TeamLeadPage';
+import TeamLeadCasesPage from './TeamLeadCasesPage';
+
+
+// Future: import ManagerPage, AdminPage, etc.
 
 function AppRouter() {
   return (
     <Router>
       <Routes>
-        {/* Redirect base path to /appeal-command-center */}
-        <Route path="/" element={<Navigate to="/appeal-command-center" replace />} />
+        <Route path="/" element={<LoginPage />} />
 
-        {/* Routes wrapped with HomePage layout */}
-        <Route
-          path="/appeal-command-center"
-          element={
-            <HomePage>
-              <AppealCommandCenter />
-            </HomePage>
-          }
-        />
-        <Route
-          path="/appeal-status-overview"
-          element={
-            <HomePage>
-              <AppealStatusOverview />
-            </HomePage>
-          }
-        />
+        {/* Client routes wrapped with shared layout */}
+        <Route path="/client" element={<ClientPage />}>
+          <Route path="executive-summary" element={<ExecutiveSummary />} />
+          <Route path="facets" element={<FacetsPage />} />
+          <Route path="proclaim" element={<ProclaimPage />} />
+        </Route>
+        <Route path="/teamlead" element={<TeamLeadPage />}>
+           <Route path="teamlead-cases" element={<TeamLeadCasesPage />} />
+        </Route>
       </Routes>
     </Router>
   );

@@ -1,4 +1,7 @@
-
+body {
+  background-color: #F0F3F5;
+  font-family: 'Lexend', sans-serif;
+}
 
 .sidebar {
   position: fixed;
