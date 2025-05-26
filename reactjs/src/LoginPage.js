@@ -19,11 +19,14 @@ const handleLogin = (e) => {
 
   sessionStorage.setItem('loginState', JSON.stringify(loginState));
 
-  if (normalized.toLowerCase() === 'client' && password === '') {
+  if (normalized.toLowerCase() === 'leader' && password === '') {
     navigate('/client');
+    } else if (username === 'agent' && password === '') {
+  navigate('/agent');
   } else if (password === '') {
     console.log("Sending login state:", loginState);
     navigate('/teamlead', { state: loginState });
+  
   } else {
     alert('Invalid credentials');
   }

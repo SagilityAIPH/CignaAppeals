@@ -4,18 +4,22 @@ import { Outlet } from "react-router-dom";
 import { MdDashboard, MdBarChart, MdPeople } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
 
-function ClientPage({ children }) {
+function AgentPage({ children }) {
   const navigate = useNavigate();
-  const [selectedItem, setSelectedItem] = useState(null); // 🆕
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  const loginState = JSON.parse(sessionStorage.getItem("loginState"));
+  const managerName = loginState?.managerNameRaw || "User";
 
   const handleNavClick = (path, itemKey) => {
-    setSelectedItem(itemKey);       // ✅ set clicked item
-    navigate(path);                 // ✅ navigate to path
+    setSelectedItem(itemKey);
+    navigate(path);
   };
 
   return (
     <>
     
+      {/* Header */}
 <header
   style={{
     height: "60px",
@@ -23,16 +27,16 @@ function ClientPage({ children }) {
     color: "white",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between", // Push items to opposite sides
-    padding: "0 24px", // Add space on left and right
+    justifyContent: "space-between",
+    padding: "0 24px",
     position: "fixed",
     top: 0,
     left: 0,
-    right: 0, // Ensure it stretches fully
+    right: 0,
     width: "100%",
     zIndex: 1100,
-    boxSizing: "border-box", // ✅ Ensure padding doesn’t overflow
-    overflow: "hidden", // ✅ Prevent children from spilling
+    boxSizing: "border-box",
+    overflow: "hidden",
   }}
 >
   {/* Logo on the left */}
@@ -42,8 +46,15 @@ function ClientPage({ children }) {
     style={{ height: "50px" }}
   />
 
+  {/* Welcome message on the right */}
+<div style={{ 
+  fontSize: "16px", 
+  fontWeight: "bold", 
+  fontFamily: "'Lexend', sans-serif" 
+}}>
+  Welcome, {managerName}
+</div>
 </header>
-
 
 {/* Sidebar */}
 <div
@@ -59,11 +70,11 @@ function ClientPage({ children }) {
     paddingTop: "20px",
     zIndex: 1000,
     display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between", // pushes logout to bottom
+    flexDirection: "column", // allow vertical space distribution
+    justifyContent: "space-between", // push logout to bottom
   }}
 >
-  {/* Navigation links */}
+  {/* Top Navigation */}
   <ul
     className="nav flex-column"
     style={{
@@ -71,33 +82,11 @@ function ClientPage({ children }) {
       paddingLeft: 0,
     }}
   >
-    {/* <li className="nav-item px-3 mb-2">
-      <button
-        onClick={() => handleNavClick("/client/executive-summary", "executive-summary")}
-        style={{
-          backgroundColor: selectedItem === "executive-summary" ? "#005b9f" : "transparent",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          color: "white",
-          cursor: "pointer",
-          padding: "10px 15px",
-          borderRadius: "4px",
-          width: '92%',
-          marginLeft: '8px',
-          marginBottom: '8px'
-        }}
-      >
-        <MdDashboard style={{ marginRight: "15px" }} />
-        Executive Summary
-      </button>
-    </li> */}
-
     <li className="nav-item px-3 mb-2">
       <button
-        onClick={() => handleNavClick("/client/facets", "facets")}
+        onClick={() => handleNavClick("/agent/agent-cases", "agent-cases")}
         style={{
-          backgroundColor: selectedItem === "facets" ? "#005b9f" : "transparent",
+          backgroundColor: selectedItem === "agent-cases" ? "#005b9f" : "transparent",
           border: "none",
           display: "flex",
           alignItems: "center",
@@ -111,35 +100,13 @@ function ClientPage({ children }) {
         }}
       >
         <MdDashboard style={{ marginRight: "15px" }} />
-        Facets
-      </button>
-    </li>
-
-    <li className="nav-item px-3 mb-2">
-      <button
-        onClick={() => handleNavClick("/client/proclaim", "proclaim")}
-        style={{
-          backgroundColor: selectedItem === "proclaim" ? "#005b9f" : "transparent",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          color: "white",
-          cursor: "pointer",
-          padding: "10px 15px",
-          borderRadius: "4px",
-          width: '92%',
-          marginLeft: '8px',
-          marginBottom: '8px'
-        }}
-      >
-        <MdDashboard style={{ marginRight: "15px" }} />
-        Proclaim
+        Cases
       </button>
     </li>
   </ul>
 
   {/* Logout Button at Bottom */}
-  <div style={{ padding: "0 20px 40px" }}>
+  <div style={{ padding: "0 20px 40px" }}> {/* 👈 padding-bottom: 40px */}
     <button
       onClick={() => {
         localStorage.clear();
@@ -174,4 +141,4 @@ function ClientPage({ children }) {
   );
 }
 
-export default ClientPage;
+export default AgentPage;

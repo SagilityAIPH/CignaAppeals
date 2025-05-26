@@ -31,6 +31,10 @@ function ClientProclaimPage() {
     const [selectedIfpGsp, setSelectedIfpGsp] = useState('All');
     const [proclaimSummary, setProclaimSummary] = useState([]);
     const [proclaimTrend, setProclaimTrend] = useState([]);
+    const [impactStatusFilter, setImpactStatusFilter] = useState('All'); // 'All', 'Failed', 'Open'
+    const [rawImpactData, setRawImpactData] = useState([]);
+    const [latestProclaimDate, setLatestProclaimDate] = useState('');
+const [latestProclaimCounts, setLatestProclaimCounts] = useState({});
 
     const marqueeMessages = useMemo(() => [
     ` `,
@@ -101,6 +105,46 @@ function ClientProclaimPage() {
         return value || '';
     }
     };
+
+
+const generateImpactSummary = (data, statusFilter) => {
+  const departments = ['Concentrix', 'Sagility', 'Stateside', 'Wipro'];
+  const ageBuckets = ['0-15 days', '16-30 days', '31-60 days', '61+ days'];
+
+  const grouped = {};
+  departments.forEach(dept => {
+    grouped[dept] = Object.fromEntries(ageBuckets.map(bucket => [bucket, 0]));
+  });
+
+  data.forEach(row => {
+    const status = (row['Case status'] || '').trim().toLowerCase();
+    if (statusFilter !== 'All' && status !== statusFilter.toLowerCase()) return;
+
+    const dept = row['helper_location2'];
+    const bucket = row['helper_AGE_bucket2'];
+    if (departments.includes(dept) && ageBuckets.includes(bucket)) {
+      grouped[dept][bucket]++;
+    }
+  });
+
+  const summary = departments.map(dept => {
+    const counts = grouped[dept];
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    return { Department: dept, ...counts, Total: total };
+  });
+
+  const grandTotal = { Department: 'Total' };
+  ageBuckets.forEach(bucket => {
+    grandTotal[bucket] = summary.reduce((sum, row) => sum + row[bucket], 0);
+  });
+  grandTotal.Total = summary.reduce((sum, row) => sum + row.Total, 0);
+  summary.push(grandTotal);
+
+  return summary;
+};
+
+
+
     const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -173,20 +217,19 @@ if (gnbSheet) {
         const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
         setExcelData(json);
 
-         // ✅ Proclaim Appeal NUmbers
-        const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro'];
-        const proclaimAppeals = proclaimDirectors.map(director => {
-          const count = json.filter(row =>
-            (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
-            (row['Department'] || '').toLowerCase().includes('appeal') &&
-            (row['Director'] || '').trim() === director
-          ).length;
+// ✅ Proclaim Appeal Numbers
+const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro'];
+const proclaimAppeals = proclaimDirectors.map(director => {
+  const count = json.filter(row =>
+    (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
+    (row['Department'] || '').toLowerCase().includes('appeal') &&
+    (row['Director'] || '').trim() === director
+  ).length;
 
-          return { Department: director, Count: count };
-        });
+  return { Department: director, Count: count };
+});
 
-        setProclaimSummary(proclaimAppeals);
-        // 👇 Breakdown Proclaim Appeals by date and GSP
+// 👇 Breakdown Proclaim Appeals by date and GSP
 const trendMap = {};
 json.forEach(row => {
   const system = (row['Claim System'] || '').trim().toLowerCase();
@@ -213,7 +256,28 @@ json.forEach(row => {
 });
 
 const trendData = Object.values(trendMap).sort((a, b) => new Date(a.date) - new Date(b.date));
+const proclaimLatestDate = trendData.length > 0 ? trendData[trendData.length - 1].date : null;
+
+const latestDateCounts = proclaimLatestDate
+  ? json.filter(row =>
+      (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
+      (row['Department'] || '').toLowerCase().includes('appeal') &&
+      (row['Director'] || '').trim() &&
+      new Date(formatExcelDate(row['ReportDate']))?.toISOString().split('T')[0] === proclaimLatestDate
+    ).reduce((acc, row) => {
+      const dir = (row['Director'] || '').trim();
+      if (proclaimDirectors.includes(dir)) {
+        acc[dir] = (acc[dir] || 0) + 1;
+      }
+      return acc;
+    }, {})
+  : {};
+
+setProclaimSummary(proclaimAppeals);
 setProclaimTrend(trendData);
+setLatestProclaimDate(proclaimLatestDate);
+setLatestProclaimCounts(latestDateCounts);
+
 
 
         // ✅ Add this right here — after reading "DATA"
@@ -230,12 +294,18 @@ setProclaimTrend(trendData);
             });
 
             impactData.forEach(row => {
+            const status = (row['Case status'] || '').trim().toLowerCase();
+            if (
+              impactStatusFilter !== 'All' &&
+              status !== impactStatusFilter.toLowerCase()
+            ) return;
+
             const dept = row['helper_location2'];
             const bucket = row['helper_AGE_bucket2'];
             if (departments.includes(dept) && ageBuckets.includes(bucket)) {
-                grouped[dept][bucket]++;
+              grouped[dept][bucket]++;
             }
-            });
+          });
 
             const summary = departments.map(dept => {
             const counts = grouped[dept];
@@ -249,7 +319,8 @@ setProclaimTrend(trendData);
             });
             grandTotal.Total = summary.reduce((sum, row) => sum + row.Total, 0);
             summary.push(grandTotal);
-            setImpactSummary(summary);
+            setImpactSummary(generateImpactSummary(impactData, impactStatusFilter));
+            setRawImpactData(impactData);
         }
 
         // Get Preservice rows and headers
@@ -579,21 +650,29 @@ const orderedBucketColors = [
       Proclaim Appeals Summary
     </h3>
 
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      backgroundColor: '#e8f0fe',
-      border: '1px solid #c4d4ec',
-      borderRadius: '8px',
-      padding: '16px',
-      marginBottom: '16px',
-      boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
-    }}>
-      <div style={{ fontSize: '16px', fontWeight: '600', color: '#003b70' }}>
-        Total Proclaim Appeals: {proclaimSummary.reduce((sum, row) => sum + row.Count, 0)}
-      </div>
-    </div>
+<div style={{
+  backgroundColor: '#e8f0fe',
+  border: '1px solid #c4d4ec',
+  borderRadius: '8px',
+  padding: '16px',
+  marginBottom: '16px',
+  boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
+}}>
+  <div style={{ fontSize: '16px', fontWeight: '600', color: '#003b70', marginBottom: '6px' }}>
+    Total Proclaim Appeals as of {`${new Date().toLocaleString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric',})}`}
+  </div>
+<div style={{ fontSize: '14px', fontWeight: '500', color: '#003b70' }}>
+  Total Appeals: {(
+    (latestProclaimCounts.Sagility || 0) +
+    (latestProclaimCounts.Concentrix || 0) +
+    (latestProclaimCounts.Wipro || 0)
+  )} &nbsp;&nbsp;|&nbsp;&nbsp;
+  Sagility: {latestProclaimCounts.Sagility || 0} &nbsp;&nbsp;|&nbsp;&nbsp;
+  Concentrix: {latestProclaimCounts.Concentrix || 0} &nbsp;&nbsp;|&nbsp;&nbsp;
+  Wipro: {latestProclaimCounts.Wipro || 0}
+</div>
+</div>
+
 
     <div style={{
       marginTop: '10px',
@@ -1177,6 +1256,36 @@ const orderedBucketColors = [
       Impact Summary
     </h3>
 
+
+<div style={{ marginBottom: '12px' }}>
+  <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+    Filter by Case Status:
+  </label>
+  <select
+    value={impactStatusFilter}
+    onChange={(e) => {
+      const status = e.target.value;
+      setImpactStatusFilter(status);
+      setImpactSummary(generateImpactSummary(rawImpactData, status));
+    }}
+    style={{
+      padding: '8px 12px',
+      borderRadius: '6px',
+      border: '1px solid #ccc',
+      fontSize: '14px',
+      width: '150px',
+      fontFamily: 'inherit',
+      color: '#003b70',
+      backgroundColor: '#fff',
+    }}
+  >
+    {['All', 'Open', 'Failed'].map((opt) => (
+      <option key={opt} value={opt}>{opt}</option>
+    ))}
+  </select>
+</div>
+
+
     <div style={{ overflowX: 'auto', border: '1px solid #ddd' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
         <thead style={{ backgroundColor: '#009fe3', color: 'white' }}>
@@ -1363,9 +1472,9 @@ const orderedBucketColors = [
           <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
           <Tooltip />
           <Legend 
-  wrapperStyle={{ fontSize: '12px' }}
-  formatter={(value) => `${value} days`}
-/>
+            wrapperStyle={{ fontSize: '12px' }}
+            formatter={(value) => `${value} days`}
+          />
 
           {orderedBucketColors
             .filter(({ bucket }) =>

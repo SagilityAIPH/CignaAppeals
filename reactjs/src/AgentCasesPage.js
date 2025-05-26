@@ -13,22 +13,10 @@ import {
 } from 'recharts';
 import { useLocation } from 'react-router-dom'; // ⬅️ Add this line at the top
 
-function TeamLeadCasesPage() {
+function AgentCasesPage() {
 const location = useLocation();
 
-const stateFromRoute = location.state;
-const stateFromStorage = JSON.parse(sessionStorage.getItem('loginState') || '{}');
 
-const managerNameRaw = stateFromRoute?.managerNameRaw || stateFromStorage.managerNameRaw;
-const displayManagerName = location.state?.managerNameRaw ?? managerNameRaw;
-console.log("Router state:", stateFromRoute);
-console.log("Storage fallback:", stateFromStorage);
-
-const managerName =
-  (location.state?.managerName || stateFromStorage.managerName || '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
     const [preserviceRows, setPreserviceRows] = useState([]);
     const [preserviceHeaders, setPreserviceHeaders] = useState([]);
     const [selectedRow, setSelectedRow] = useState(null);
@@ -39,7 +27,6 @@ const managerName =
     const [filterValue, setFilterValue] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);
     const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Open' | 'Completed'
-  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
 
     // ✅ Reset to page 1 when filters change
     useEffect(() => {
@@ -53,7 +40,7 @@ const managerName =
 
 const preserviceColumnMap = {
   'Age Cal': 'AGE',
-  'SR': 'SR.', // ← ✅ FIXED: 'SR .' changed to 'SR'
+  'SR': 'SR.',
   'Manager': 'Manager',
   'AGE_PROMISE_BUCKET': 'PROMISE',
   'Promise Date': 'Task Promise Date',
@@ -63,7 +50,7 @@ const preserviceColumnMap = {
   'PG?': 'PG?',
   'PG NAME2': 'PG Name',
   'OwnerID': 'OwnerID',
-  'OwnerName': 'Owner'
+  'OwnerName': 'Owner' // ← most likely this is the correct field
 };
   
 const resolveExcelHeader = (friendlyHeader) => {
@@ -96,17 +83,7 @@ const resolveExcelHeader = (friendlyHeader) => {
     }
   };
 
-const markPaginatedRowsAsPending = () => {
-  const updated = preserviceRows.map(row => {
-    const isVisible = paginatedRows.some(visible => visible['SR'] === row['SR']);
-    if (isVisible) {
-      return { ...row, OWNER_HELPER: 'PENDING' };
-    }
-    return row;
-  });
-
-  setPreserviceRows(updated);
-};
+const filteredPreserviceRows = useMemo(() => {
 
 
 const getOwnerHelperValue = (row) => {
@@ -116,65 +93,55 @@ const getOwnerHelperValue = (row) => {
   return (row[key] || '').trim().toUpperCase();
 };
 
+let result = preserviceRows.filter(row => {
+  const status = getOwnerHelperValue(row);
+  const ownerKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'owner');
+const ownerName = (row['OwnerName'] || '').trim().toUpperCase();
 
-const filteredPreserviceRows = useMemo(() => {
+  const isValidOwner = ownerName.includes('SHARANAPPA') || ownerName.includes('VEERESHA');
+  if (!isValidOwner) return false;
 
+if (statusFilter === 'All') return true;
+if (statusFilter === 'Open') return status !== 'COMPLETED' && status !== 'PENDING';
+if (statusFilter === 'Completed') return status === 'COMPLETED';
+if (statusFilter === 'Pending') return status === 'PENDING';
+  return false;
+});
 
-  let result = preserviceRows.filter(row => {
-    const status = getOwnerHelperValue(row);
-
-    switch (statusFilter) {
-      case 'All':
-        return true;
-      case 'Open':
-        return status === 'ASSIGNED' || status === 'UNASSIGNED' || status === '';
-      case 'Pending':
-        return status === 'PENDING';
-      case 'Completed':
-        return status === 'COMPLETED';
-      default:
-        return true;
-    }
-  });
-
-  // Filter by Manager
-  result = result.filter(row => {
-    const managerKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'manager');
-    if (!managerKey) return false;
-
-    const rawManager = String(row[managerKey] || '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
-
-    return rawManager === managerName?.toLowerCase();
-  });
-
-  // Filter by selectedGsp (Director)
   if (selectedGsp !== 'All') {
     result = result.filter(row => (row['Director'] || '').trim() === selectedGsp);
   }
 
-  // Filter by column + value
-  if (filterColumn && filterValue) {
-    const actualKey = resolveExcelHeader(filterColumn);
-    const selectedValues = filterValue
-      .split(',')
-      .map(s => s.trim().toUpperCase())
-      .filter(Boolean);
+if (filterColumn && filterValue) {
+  const actualKey = resolveExcelHeader(filterColumn);
+  console.log("🔎 Filter Column (UI):", filterColumn);
+  console.log("🧠 Resolved Key:", actualKey);
+  console.log("🎯 Filter Value:", filterValue);
 
-    result = result.filter(row => {
-      const raw = row[actualKey];
-      if (!raw) return false;
+  result = result.filter(row => {
+    const keyMatch = Object.keys(row).find(k =>
+      k.trim().toLowerCase() === actualKey.trim().toLowerCase()
+    );
 
-      const rowValue = String(raw).toUpperCase();
-      return selectedValues.some(val => rowValue.includes(val));
-    });
-  }
+    if (!keyMatch) {
+      console.log("❌ Key not found in row:", row);
+      return false;
+    }
+
+    const rowValue = String(row[keyMatch] ?? '').trim();
+    const selected = String(filterValue).trim();
+
+    const isMatch = rowValue === selected;
+    if (isMatch) {
+      console.log("✅ MATCH:", { rowValue, selected, keyMatch });
+    }
+
+    return isMatch;
+  });
+}
 
   return result;
-}, [preserviceRows, managerName, selectedGsp, filterColumn, filterValue, statusFilter]);
-
+}, [preserviceRows, selectedGsp, filterColumn, filterValue, statusFilter]);
 
 
 
@@ -187,16 +154,6 @@ const paginatedRows = filteredPreserviceRows.slice(
   (currentPage - 1) * rowsPerPage,
   currentPage * rowsPerPage
 );
-
-// ⬇️ INSERT THIS HERE
-const managerCasesWithStatus = useMemo(() => {
-  return preserviceRows
-    .filter(r => (r['Manager'] || '').trim().toLowerCase() === managerNameRaw.trim().toLowerCase())
-    .map(r => ({
-      ...r,
-      _STATUS: getOwnerHelperValue(r)
-    }));
-}, [preserviceRows, managerNameRaw]);
 
 const isAllSelected = paginatedRows.length > 0 && paginatedRows.every(row =>
   selectedRows.some(selected => selected['SR'] === row['SR'])
@@ -222,7 +179,6 @@ const toggleRowSelection = (row) => {
 
 
 const handleFileUpload = (event) => {
-
   const file = event.target.files[0];
   if (!file) return;
 
@@ -250,12 +206,12 @@ const handleFileUpload = (event) => {
           Object.fromEntries(normalizedHeaders.map((key, i) => [key, row[i] ?? '']))
         );
 
-          console.log("Sample Row:", fixedData[0]);
-console.log("Available Keys:", Object.keys(fixedData[0]));
-
         // ✅ Set Pre-Service data
         setPreserviceRows(fixedData);
-        console.log("👀 Sample OwnerNames:", fixedData.map(r => r["OwnerName"]));
+console.log("🔑 Sample Row Keys:", Object.keys(fixedData[0] || {}));
+console.log("🧾 Unique Owner Names:", [...new Set(fixedData.map(row => (row['OwnerName'] || '').trim().toUpperCase()))]);
+
+
         setPreserviceHeaders(normalizedHeaders);
 
         // ✅ Build Total Appeals Summary (filtered by current manager)
@@ -266,9 +222,9 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
         const managerKey = 'Manager';
 
         fixedData.forEach(row => {
-          const rawManager = (row[managerKey] || '').toLowerCase().trim();
-          const matchManager = rawManager === managerNameRaw.toLowerCase().trim();
-          if (!matchManager) return;
+          const validOwners = ['SHARANAPPA', 'VEERESHA'];
+const owner = (row['OwnerName'] || '').trim().toUpperCase();
+if (!validOwners.includes(owner)) return;
 
           const rawDept = (row[deptKey] || '').trim();
           const bucket = (row[bucketKey] || '').trim();
@@ -454,38 +410,79 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
         </div>
 
         {/* Case Summary Card */}
-        <div style={{ marginTop: '20px', backgroundColor: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', width: '93.3%', fontSize: '14px' }}>
+{/* Case Summary Card */}
+<div
+  style={{
+    marginTop: '20px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+    width: '93.3%',
+    fontSize: '14px',
+  }}
+>
   <h4 style={{ marginTop: '0px', marginBottom: '16px', color: '#003b70', fontWeight: '600' }}>
     Case Summary
   </h4>
 
   {(() => {
-    const total = managerCasesWithStatus.length;
-const completed = managerCasesWithStatus.filter(r => r._STATUS === 'COMPLETED').length;
-const pending = managerCasesWithStatus.filter(r => r._STATUS === 'PENDING').length;
-const open = total - completed - pending;
+    const normalize = (val) => (val || '').trim().toUpperCase();
 
-    const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+    const getOwnerHelperValue = (row) => {
+      const key = Object.keys(row).find(k =>
+        k.trim().replace(/\s+/g, '_').toUpperCase() === 'OWNER_HELPER'
+      );
+      return normalize(row[key]);
+    };
+
+    const validOwners = ['SHARANAPPA', 'VEERESHA'];
+const ownedRows = preserviceRows.filter(
+  r => validOwners.some(name => normalize(r['OwnerName']).includes(name))
+);
+
+    const completed = ownedRows.filter(r => getOwnerHelperValue(r) === 'COMPLETED').length;
+    const pending = ownedRows.filter(r => getOwnerHelperValue(r) === 'PENDING').length;
+    const open = ownedRows.filter(r => {
+      const status = getOwnerHelperValue(r);
+      return status !== 'COMPLETED' && status !== 'PENDING';
+    }).length;
+
+    const total = ownedRows.length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return (
       <>
         <div style={{ marginBottom: '8px' }}>
-          <span role="img" aria-label="folder">📁</span> Total Cases: <strong>{total}</strong>
-        </div>
-        <div style={{ marginBottom: '8px' }}>
-          <span role="img" aria-label="hourglass">⏳</span> Open / Untouched: <strong>{open}</strong>
-        </div>
-        <div style={{ marginBottom: '8px' }}>
-          <span role="img" aria-label="pending">🟡</span> Pending: <strong>{pending}</strong>
-        </div>
-        <div style={{ marginBottom: '12px' }}>
-          <span role="img" aria-label="check">✅</span> Completed: <strong>{completed}</strong>
+          <span role="img" aria-label="folder">📁</span> Total Cases:{' '}
+          <strong>{total}</strong>
         </div>
 
+        <div style={{ marginBottom: '8px' }}>
+          <span role="img" aria-label="hourglass">⏳</span> Open / Untouched:{' '}
+          <strong>{open}</strong>
+        </div>
+
+        <div style={{ marginBottom: '8px' }}>
+          <span role="img" aria-label="check">✅</span> Completed:{' '}
+          <strong>{completed}</strong>
+        </div>
+
+        <div style={{ marginBottom: '12px' }}>
+          <span role="img" aria-label="pause">📦</span> Pending:{' '}
+          <strong>{pending}</strong>
+        </div>
+
+        {/* Progress Bar */}
         <div style={{ fontSize: '12px', marginBottom: '4px', color: '#003b70', fontWeight: '500' }}>
           Completion Rate
         </div>
-        <div style={{ backgroundColor: '#e0e0e0', borderRadius: '20px', height: '10px', overflow: 'hidden' }}>
+        <div style={{
+          backgroundColor: '#e0e0e0',
+          borderRadius: '20px',
+          height: '10px',
+          overflow: 'hidden',
+        }}>
           <div
             style={{
               height: '100%',
@@ -495,11 +492,18 @@ const open = total - completed - pending;
             }}
           />
         </div>
-        <div style={{ fontSize: '12px', marginTop: '4px', textAlign: 'right' }}>{percent}%</div>
+        <div style={{ fontSize: '12px', marginTop: '4px', textAlign: 'right' }}>
+          {percent}%
+        </div>
       </>
     );
   })()}
 </div>
+
+
+
+
+
 
 
 
@@ -654,8 +658,7 @@ const open = total - completed - pending;
   padding: '16px',
   marginBottom: '16px',
   marginTop: '0px',
-  boxShadow: '0 4px 8px rgba(0,0,0,0.05)',
-  gap: '20px'
+  boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
 }}>
   <div style={{
     fontSize: '16px',
@@ -665,7 +668,37 @@ const open = total - completed - pending;
     Total Appeal Cases: {filteredPreserviceRows.length}
   </div>
 
-  <div style={{ display: 'flex', gap: '12px' }}>
+  <div style={{ display: 'flex', gap: '10px' }}>
+    {/* Mark as Pending Button */}
+    <button
+      onClick={() => {
+        const updated = preserviceRows.map(row => {
+          const match = selectedRows.some(sel => sel['SR'] === row['SR']);
+          if (match) {
+            return { ...row, OWNER_HELPER: 'PENDING' };
+          }
+          return row;
+        });
+
+        setPreserviceRows(updated);
+        setSelectedRows([]);
+        setCurrentPage(1);
+      }}
+      disabled={selectedRows.length === 0}
+      style={{
+        backgroundColor: selectedRows.length > 0 ? '#ffc107' : '#aaa',
+        color: 'white',
+        border: 'none',
+        padding: '8px 16px',
+        borderRadius: '6px',
+        cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
+        fontWeight: '600'
+      }}
+    >
+      Mark as Pending
+    </button>
+
+    {/* Mark as Completed Button */}
     <button
       onClick={() => {
         const updated = preserviceRows.map(row => {
@@ -693,25 +726,8 @@ const open = total - completed - pending;
     >
       Mark as Completed
     </button>
-
-    <button
-      onClick={() => setShowFollowUpModal(true)}
-      disabled={selectedRows.length === 0}
-      style={{
-        backgroundColor: selectedRows.length > 0 ? '#ff9800' : '#aaa',
-        color: 'white',
-        border: 'none',
-        padding: '8px 16px',
-        borderRadius: '6px',
-        cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
-        fontWeight: '600'
-      }}
-    >
-      Send for FollowUp
-    </button>
   </div>
 </div>
-
 
 
 
@@ -740,10 +756,12 @@ const open = total - completed - pending;
   >
     <option value="All">All</option>
     <option value="Open">Open</option>
-    <option value="Pending">Pending</option>
     <option value="Completed">Completed</option>
+    <option value="Pending">Pending</option>
   </select>
 </div>
+
+
 
 
 
@@ -775,22 +793,9 @@ const open = total - completed - pending;
         {header}
       </th>
     ))}
-<th
-  onClick={markPaginatedRowsAsPending}
-  style={{
-    padding: '8px',
-    border: '1px solid #ccc',
-    fontWeight: '600',
-    textAlign: 'left',
-    cursor: 'pointer',
-    color: '#0071ce',
-    textDecoration: 'underline'
-  }}
-  title="Click to set status as PENDING for visible rows only"
->
+<th style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
   Status
 </th>
-
 <th style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
   Actions
 </th>
@@ -820,13 +825,12 @@ const open = total - completed - pending;
 {/* ✅ Status Column */}
 <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '500' }}>
   {(() => {
-    const raw = (row['OWNER_HELPER'] || '').trim().toUpperCase();
-    const owner = (row['Owner'] || '').toUpperCase();
-    const status = raw || (owner.includes('SHARANAPPA') || owner.includes('VEERESHA') ? 'PENDING' : 'OPEN');
-    return status;
+    const status = (row['OWNER_HELPER'] || '').trim().toUpperCase();
+    if (status === 'COMPLETED') return 'COMPLETED';
+    if (status === 'PENDING') return 'PENDING';
+    return 'OPEN';
   })()}
 </td>
-
 
 {/* ✅ Actions Column */}
 <td style={{ padding: '8px', border: '1px solid #eee' }}>
@@ -988,89 +992,9 @@ const open = total - completed - pending;
   </div>
 )}
 
-{showFollowUpModal && (
-  <div
-    onClick={() => setShowFollowUpModal(false)}
-    onKeyDown={(e) => e.key === 'Escape' && setShowFollowUpModal(false)}
-    tabIndex={0}
-    style={{
-      position: 'fixed',
-      top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-    }}
-  >
-    <div
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        backgroundColor: 'white',
-        borderRadius: '10px',
-        padding: '24px',
-        maxWidth: '400px',
-        width: '90%',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-        textAlign: 'center',
-      }}
-    >
-      <h3 style={{ marginBottom: '16px', color: '#003b70' }}>
-        Confirm Follow Up
-      </h3>
-      <p style={{ marginBottom: '20px', fontSize: '14px' }}>
-        Are you sure you want to send the selected case(s) for follow-up?
-      </p>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
-        <button
-          onClick={() => {
-            const updated = preserviceRows.map(row => {
-              const match = selectedRows.some(sel => sel['SR'] === row['SR']);
-              if (match) {
-                return { ...row, OWNER_HELPER: 'PENDING' };
-              }
-              return row;
-            });
-
-            setPreserviceRows(updated);
-            setSelectedRows([]);
-            setShowFollowUpModal(false);
-            setCurrentPage(1);
-          }}
-          style={{
-            backgroundColor: '#ff9800',
-            color: 'white',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Yes, Send
-        </button>
-        <button
-          onClick={() => setShowFollowUpModal(false)}
-          style={{
-            backgroundColor: '#ccc',
-            color: '#333',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            fontWeight: '500',
-            cursor: 'pointer'
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
 
     </div>
   );
 }
 
-export default TeamLeadCasesPage;
+export default AgentCasesPage;
