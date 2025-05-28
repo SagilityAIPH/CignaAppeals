@@ -15,7 +15,7 @@ import AgentCasesPage from './AgentCasesPage';
 
 function AppRouter() {
   return (
-    <Router basename='/LoginPage'>
+    <Router basename='/CignaAppeals'>
       <Routes>
         <Route path="/" element={<LoginPage />} />
 
