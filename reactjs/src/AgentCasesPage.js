@@ -27,6 +27,9 @@ const location = useLocation();
     const [filterValue, setFilterValue] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);
     const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Open' | 'Completed'
+  const [showPendingModal, setShowPendingModal] = useState(false);
+const [showCompletedModal, setShowCompletedModal] = useState(false);
+const [pendingReason, setPendingReason] = useState('');
 
     // ✅ Reset to page 1 when filters change
     useEffect(() => {
@@ -669,63 +672,43 @@ const ownedRows = preserviceRows.filter(
   </div>
 
   <div style={{ display: 'flex', gap: '10px' }}>
+
+
+
     {/* Mark as Pending Button */}
-    <button
-      onClick={() => {
-        const updated = preserviceRows.map(row => {
-          const match = selectedRows.some(sel => sel['SR'] === row['SR']);
-          if (match) {
-            return { ...row, OWNER_HELPER: 'PENDING' };
-          }
-          return row;
-        });
+<button
+  onClick={() => setShowPendingModal(true)}
+  disabled={selectedRows.length === 0}
+  style={{
+    backgroundColor: selectedRows.length > 0 ? '#ffc107' : '#aaa',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
+    fontWeight: '600'
+  }}
+>
+  Mark as Pended
+</button>
 
-        setPreserviceRows(updated);
-        setSelectedRows([]);
-        setCurrentPage(1);
-      }}
-      disabled={selectedRows.length === 0}
-      style={{
-        backgroundColor: selectedRows.length > 0 ? '#ffc107' : '#aaa',
-        color: 'white',
-        border: 'none',
-        padding: '8px 16px',
-        borderRadius: '6px',
-        cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
-        fontWeight: '600'
-      }}
-    >
-      Mark as Pending
-    </button>
+{/* Mark as Completed Button */}
+<button
+  onClick={() => setShowCompletedModal(true)}
+  disabled={selectedRows.length === 0}
+  style={{
+    backgroundColor: selectedRows.length > 0 ? '#28a745' : '#aaa',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
+    fontWeight: '600'
+  }}
+>
+  Mark as Completed
+</button>
 
-    {/* Mark as Completed Button */}
-    <button
-      onClick={() => {
-        const updated = preserviceRows.map(row => {
-          const match = selectedRows.some(sel => sel['SR'] === row['SR']);
-          if (match) {
-            return { ...row, OWNER_HELPER: 'COMPLETED' };
-          }
-          return row;
-        });
-
-        setPreserviceRows(updated);
-        setSelectedRows([]);
-        setCurrentPage(1);
-      }}
-      disabled={selectedRows.length === 0}
-      style={{
-        backgroundColor: selectedRows.length > 0 ? '#28a745' : '#aaa',
-        color: 'white',
-        border: 'none',
-        padding: '8px 16px',
-        borderRadius: '6px',
-        cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
-        fontWeight: '600'
-      }}
-    >
-      Mark as Completed
-    </button>
   </div>
 </div>
 
@@ -986,6 +969,156 @@ const ownedRows = preserviceRows.filter(
           }}
         >
           Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
+{showPendingModal && (
+  <div
+    onClick={() => setShowPendingModal(false)}
+    style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '10px',
+        maxWidth: '500px',
+        width: '90%'
+      }}
+    >
+      <h3 style={{ marginTop: 0, color: '#003b70' }}>Confirm Pended Status</h3>
+      <p>Please provide a reason for marking the selected {selectedRows.length} case(s) as <strong>Pended</strong>:</p>
+      <textarea
+        value={pendingReason}
+        onChange={(e) => setPendingReason(e.target.value)}
+        placeholder="Enter reason for pending..."
+        style={{
+          width: '100%',
+          height: '100px',
+          marginTop: '10px',
+          padding: '10px',
+          borderRadius: '6px',
+          border: '1px solid #ccc'
+        }}
+      />
+      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <button
+          onClick={() => setShowPendingModal(false)}
+          style={{
+            backgroundColor: '#ccc',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            const updated = preserviceRows.map(row => {
+              const match = selectedRows.some(sel => sel['SR'] === row['SR']);
+              if (match) {
+                return { ...row, OWNER_HELPER: 'PENDING', PENDING_REASON: pendingReason };
+              }
+              return row;
+            });
+
+            setPreserviceRows(updated);
+            setSelectedRows([]);
+            setCurrentPage(1);
+            setPendingReason('');
+            setShowPendingModal(false);
+          }}
+          disabled={pendingReason.trim() === ''}
+          style={{
+            backgroundColor: '#ffc107',
+            color: 'white',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '6px',
+            fontWeight: '600',
+            cursor: pendingReason.trim() === '' ? 'not-allowed' : 'pointer'
+          }}
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+{showCompletedModal && (
+  <div
+    onClick={() => setShowCompletedModal(false)}
+    style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '10px',
+        maxWidth: '400px',
+        width: '90%'
+      }}
+    >
+      <h3 style={{ marginTop: 0, color: '#003b70' }}>Confirm Completed Status</h3>
+      <p>Are you sure you want to mark {selectedRows.length} case(s) as <strong>Completed</strong>?</p>
+      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <button
+          onClick={() => setShowCompletedModal(false)}
+          style={{
+            backgroundColor: '#ccc',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            const updated = preserviceRows.map(row => {
+              const match = selectedRows.some(sel => sel['SR'] === row['SR']);
+              if (match) {
+                return { ...row, OWNER_HELPER: 'COMPLETED' };
+              }
+              return row;
+            });
+
+            setPreserviceRows(updated);
+            setSelectedRows([]);
+            setCurrentPage(1);
+            setShowCompletedModal(false);
+          }}
+          style={{
+            backgroundColor: '#28a745',
+            color: 'white',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '6px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          Confirm
         </button>
       </div>
     </div>

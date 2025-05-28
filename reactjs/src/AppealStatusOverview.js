@@ -444,7 +444,7 @@ const categoryColors = [
     <HomePage active={"appealStatus"} setActive={() => {}}>
       <div style={{ padding: "20px", marginTop: "30px", marginLeft: "-280px" }}>
         <div className="uploader" style={{ paddingTop: "20px", paddingLeft: "20px", paddingBottom: '20px', marginTop: '0px' }}>
-          <Form.Select
+          {/* <Form.Select
             aria-label="Select Report Type"
             style={{ width: "300px", marginBottom: "10px", fontSize: "15px" }}
             value={active}
@@ -453,7 +453,7 @@ const categoryColors = [
             <option value="">-- Select Report --</option>
             <option value="appeals">Appeals Open Inventory Report</option>
             <option value="impact">Impact</option>
-          </Form.Select>
+          </Form.Select> */}
 
           <input
             type="file"

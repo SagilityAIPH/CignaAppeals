@@ -37,11 +37,9 @@ function ClientProclaimPage() {
 const [latestProclaimCounts, setLatestProclaimCounts] = useState({});
 
     const marqueeMessages = useMemo(() => [
-    ` `,
     `🚀 Welcome to the Proclaim Dashboard`,
     ` `,
 
-    ` `,
       `As of ${new Date().toLocaleString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric',})}  12:00`,
     ` `,
 
@@ -64,7 +62,7 @@ const [latestProclaimCounts, setLatestProclaimCounts] = useState({});
 
     ], [filteredPreserviceRows, impactSummary]);
 
-    const messagesPerSlide = 3; // 👈 Put this just above useEffect
+    const messagesPerSlide = 2; // 👈 Put this just above useEffect
 
     useEffect(() => {
       const interval = setInterval(() => {
@@ -583,10 +581,10 @@ const orderedBucketColors = [
 {showMarquee && (
   <div style={{
     position: 'fixed',
-    top: '70px',
+    top: '3px',
     right: '30px',
     width: '330px',
-    height: '80px', // Enough space for 3 lines
+    height: '52px', // Enough space for 3 lines
     overflow: 'hidden',
     backgroundColor: '#e6f2ff',
     borderRadius: '8px',
@@ -602,7 +600,7 @@ const orderedBucketColors = [
       style={{
         display: 'flex',
         flexDirection: 'column',
-        marginTop: '10px',
+        marginTop: '7px',
         marginLeft: '10px',
         gap: '4px',
         animation: 'slideUp 4s ease-in-out',

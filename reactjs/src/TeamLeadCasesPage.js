@@ -40,6 +40,9 @@ const managerName =
     const [selectedRows, setSelectedRows] = useState([]);
     const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Open' | 'Completed'
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+const [showReasonModal, setShowReasonModal] = useState(false);
+const [showAssignModal, setShowAssignModal] = useState(false);
+const [assignTo, setAssignTo] = useState('');
 
     // ✅ Reset to page 1 when filters change
     useEffect(() => {
@@ -100,7 +103,7 @@ const markPaginatedRowsAsPending = () => {
   const updated = preserviceRows.map(row => {
     const isVisible = paginatedRows.some(visible => visible['SR'] === row['SR']);
     if (isVisible) {
-      return { ...row, OWNER_HELPER: 'PENDING' };
+      return { ...row, OWNER_HELPER: 'PENDED' };
     }
     return row;
   });
@@ -123,18 +126,21 @@ const filteredPreserviceRows = useMemo(() => {
   let result = preserviceRows.filter(row => {
     const status = getOwnerHelperValue(row);
 
-    switch (statusFilter) {
-      case 'All':
-        return true;
-      case 'Open':
-        return status === 'ASSIGNED' || status === 'UNASSIGNED' || status === '';
-      case 'Pending':
-        return status === 'PENDING';
-      case 'Completed':
-        return status === 'COMPLETED';
-      default:
-        return true;
-    }
+switch (statusFilter) {
+  case 'All':
+    return true;
+  case 'ASSIGNED':
+    return status === 'ASSIGNED';
+  case 'UNASSIGNED':
+    return status === 'UNASSIGNED' || status === '';
+  case 'PENDED':
+    return status === 'PENDED';
+  case 'COMPLETED':
+    return status === 'COMPLETED';
+  default:
+    return true;
+}
+
   });
 
   // Filter by Manager
@@ -174,9 +180,6 @@ const filteredPreserviceRows = useMemo(() => {
 
   return result;
 }, [preserviceRows, managerName, selectedGsp, filterColumn, filterValue, statusFilter]);
-
-
-
 
 
 
@@ -460,27 +463,33 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
   </h4>
 
   {(() => {
-    const total = managerCasesWithStatus.length;
+const total = managerCasesWithStatus.length;
 const completed = managerCasesWithStatus.filter(r => r._STATUS === 'COMPLETED').length;
-const pending = managerCasesWithStatus.filter(r => r._STATUS === 'PENDING').length;
-const open = total - completed - pending;
+const pended = managerCasesWithStatus.filter(r => r._STATUS === 'PENDED').length;
+const assigned = managerCasesWithStatus.filter(r => r._STATUS === 'ASSIGNED').length;
+const unassigned = total - completed - pended - assigned;
+
 
     const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
 
     return (
       <>
         <div style={{ marginBottom: '8px' }}>
-          <span role="img" aria-label="folder">📁</span> Total Cases: <strong>{total}</strong>
-        </div>
-        <div style={{ marginBottom: '8px' }}>
-          <span role="img" aria-label="hourglass">⏳</span> Open / Untouched: <strong>{open}</strong>
-        </div>
-        <div style={{ marginBottom: '8px' }}>
-          <span role="img" aria-label="pending">🟡</span> Pending: <strong>{pending}</strong>
-        </div>
-        <div style={{ marginBottom: '12px' }}>
-          <span role="img" aria-label="check">✅</span> Completed: <strong>{completed}</strong>
-        </div>
+  <span role="img" aria-label="folder">📁</span> Total Cases: <strong>{total}</strong>
+</div>
+<div style={{ marginBottom: '8px' }}>
+  <span role="img" aria-label="rocket">🚀</span> Assigned: <strong>{assigned}</strong>
+</div>
+<div style={{ marginBottom: '8px' }}>
+  <span role="img" aria-label="question">❔</span> Unassigned: <strong>{unassigned}</strong>
+</div>
+<div style={{ marginBottom: '8px' }}>
+  <span role="img" aria-label="pending">🟡</span> Pended: <strong>{pended}</strong>
+</div>
+<div style={{ marginBottom: '12px' }}>
+  <span role="img" aria-label="check">✅</span> Completed: <strong>{completed}</strong>
+</div>
+
 
         <div style={{ fontSize: '12px', marginBottom: '4px', color: '#003b70', fontWeight: '500' }}>
           Completion Rate
@@ -666,6 +675,39 @@ const open = total - completed - pending;
   </div>
 
   <div style={{ display: 'flex', gap: '12px' }}>
+
+    <button
+  onClick={() => setShowAssignModal(true)}
+  disabled={selectedRows.length === 0}
+  style={{
+    backgroundColor: selectedRows.length > 0 ? '#0071ce' : '#aaa',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
+    fontWeight: '600'
+  }}
+>
+  Assign
+</button>
+
+    <button
+      onClick={() => setShowFollowUpModal(true)}
+      disabled={selectedRows.length === 0}
+      style={{
+        backgroundColor: selectedRows.length > 0 ? '#ff9800' : '#aaa',
+        color: 'white',
+        border: 'none',
+        padding: '8px 16px',
+        borderRadius: '6px',
+        cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
+        fontWeight: '600'
+      }}
+    >
+      Send for FollowUp
+    </button>
+
     <button
       onClick={() => {
         const updated = preserviceRows.map(row => {
@@ -694,21 +736,7 @@ const open = total - completed - pending;
       Mark as Completed
     </button>
 
-    <button
-      onClick={() => setShowFollowUpModal(true)}
-      disabled={selectedRows.length === 0}
-      style={{
-        backgroundColor: selectedRows.length > 0 ? '#ff9800' : '#aaa',
-        color: 'white',
-        border: 'none',
-        padding: '8px 16px',
-        borderRadius: '6px',
-        cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
-        fontWeight: '600'
-      }}
-    >
-      Send for FollowUp
-    </button>
+
   </div>
 </div>
 
@@ -739,9 +767,11 @@ const open = total - completed - pending;
     }}
   >
     <option value="All">All</option>
-    <option value="Open">Open</option>
-    <option value="Pending">Pending</option>
-    <option value="Completed">Completed</option>
+<option value="ASSIGNED">Assigned</option>
+<option value="UNASSIGNED">Unassigned</option>
+<option value="PENDED">Pended</option>
+<option value="COMPLETED">Completed</option>
+
   </select>
 </div>
 
@@ -939,9 +969,39 @@ const open = total - completed - pending;
         maxHeight: '80%',
         overflowY: 'auto',
         boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+        position: 'relative'
       }}
     >
       <h3 style={{ marginBottom: '16px', color: '#003b70' }}>Row Details</h3>
+
+      {/* ✅ Show 'Reason for Pending' button only if status is PENDING */}
+{(() => {
+  const raw = (selectedRow['OWNER_HELPER'] || '').trim().toUpperCase();
+  const owner = (selectedRow['Owner'] || '').toUpperCase();
+  const status = raw || (owner.includes('SHARANAPPA') || owner.includes('VEERESHA') ? 'PENDED' : 'OPEN');
+
+  return status === 'PENDED' ? (
+    <button
+      style={{
+        position: 'absolute',
+        top: '20px',
+        right: '20px',
+        backgroundColor: '#ff9800',
+        color: 'white',
+        border: 'none',
+        padding: '6px 12px',
+        borderRadius: '6px',
+        fontSize: '13px',
+        fontWeight: '600',
+        cursor: 'pointer'
+      }}
+      onClick={() => setShowReasonModal(true)}
+    >
+      Reason for Pended
+    </button>
+  ) : null;
+})()}
+
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
         <tbody>
           {Object.entries(selectedRow).map(([key, value]) => {
@@ -968,6 +1028,7 @@ const open = total - completed - pending;
           })}
         </tbody>
       </table>
+
       <div style={{ marginTop: '20px', textAlign: 'right' }}>
         <button
           onClick={() => setShowModal(false)}
@@ -987,6 +1048,10 @@ const open = total - completed - pending;
     </div>
   </div>
 )}
+
+
+
+
 
 {showFollowUpModal && (
   <div
@@ -1027,7 +1092,7 @@ const open = total - completed - pending;
             const updated = preserviceRows.map(row => {
               const match = selectedRows.some(sel => sel['SR'] === row['SR']);
               if (match) {
-                return { ...row, OWNER_HELPER: 'PENDING' };
+                return { ...row, OWNER_HELPER: 'PENDED' };
               }
               return row;
             });
@@ -1067,6 +1132,162 @@ const open = total - completed - pending;
     </div>
   </div>
 )}
+
+
+{showReasonModal && (
+  <div
+    onClick={() => setShowReasonModal(false)}
+    onKeyDown={(e) => e.key === 'Escape' && setShowReasonModal(false)}
+    tabIndex={0}
+    style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1100,
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        backgroundColor: 'white',
+        borderRadius: '10px',
+        padding: '24px',
+        maxWidth: '400px',
+        width: '90%',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+        textAlign: 'center',
+      }}
+    >
+      <h3 style={{ marginBottom: '16px', color: '#003b70' }}>Reason for Pended</h3>
+      <p style={{ fontSize: '14px', marginBottom: '24px' }}>
+        Missing provider documentation.
+      </p>
+      <button
+        onClick={() => setShowReasonModal(false)}
+        style={{
+          backgroundColor: '#003b70',
+          color: 'white',
+          border: 'none',
+          padding: '8px 16px',
+          borderRadius: '6px',
+          fontWeight: '500',
+          cursor: 'pointer'
+        }}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
+
+{showAssignModal && (
+  <div
+    onClick={() => setShowAssignModal(false)}
+    onKeyDown={(e) => e.key === 'Escape' && setShowAssignModal(false)}
+    tabIndex={0}
+    style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1100,
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        backgroundColor: 'white',
+        borderRadius: '10px',
+        padding: '24px',
+        maxWidth: '400px',
+        width: '90%',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+        textAlign: 'center',
+      }}
+    >
+      <h3 style={{ marginBottom: '16px', color: '#003b70' }}>Assign Selected Cases</h3>
+
+      <select
+        value={assignTo}
+        onChange={(e) => setAssignTo(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '10px',
+          borderRadius: '6px',
+          border: '1px solid #ccc',
+          fontSize: '14px',
+          marginBottom: '20px'
+        }}
+      >
+        <option value="">-- Select OwnerName --</option>
+        {[...new Set(preserviceRows.map(row => row['OwnerName']).filter(Boolean))]
+          .sort()
+          .map((name, i) => (
+            <option key={i} value={name}>{name}</option>
+          ))}
+      </select>
+
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
+        <button
+          onClick={() => {
+            const selectedOwner = preserviceRows.find(r => r['OwnerName'] === assignTo);
+            if (!selectedOwner) return;
+
+            const updated = preserviceRows.map(row => {
+              if (selectedRows.some(sel => sel['SR'] === row['SR'])) {
+                return {
+                  ...row,
+                  OwnerName: selectedOwner['OwnerName'],
+                  OwnerID: selectedOwner['OwnerID'],
+                  OWNER_HELPER: 'ASSIGNED'
+                };
+              }
+              return row;
+            });
+
+            setPreserviceRows(updated);
+            setSelectedRows([]);
+            setAssignTo('');
+            setShowAssignModal(false);
+          }}
+          disabled={!assignTo}
+          style={{
+            backgroundColor: '#0071ce',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            fontWeight: '600',
+            cursor: assignTo ? 'pointer' : 'not-allowed'
+          }}
+        >
+          Confirm
+        </button>
+        <button
+          onClick={() => setShowAssignModal(false)}
+          style={{
+            backgroundColor: '#ccc',
+            color: '#333',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            fontWeight: '500',
+            cursor: 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
 
     </div>

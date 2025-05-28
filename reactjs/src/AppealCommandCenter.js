@@ -64,6 +64,15 @@ function AppealCommandCenter() {
   const currentRows = filteredData.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(filteredData.length / rowsToShow);
 
+  const formatExcelDate = (serial) => {
+  if (!serial || isNaN(serial)) return serial;
+  const utcDays = Math.floor(serial - 25569);
+  const utcValue = utcDays * 86400;
+  const dateInfo = new Date(utcValue * 1000);
+  const formatted = dateInfo.toISOString().split("T")[0]; // YYYY-MM-DD
+  return formatted;
+};
+
   const handleAgeToggle = (bucket) => {
     const updated = ageFilter.includes(bucket)
       ? ageFilter.filter((b) => b !== bucket)
@@ -390,8 +399,8 @@ function AppealCommandCenter() {
                         <td>{row["SR ."] || row["A"]}</td>
                         <td>{row["Manager"] || row["D"]}</td>
                         <td>{row["AGE_PROMISE_BUCKET"] || row["BP"]}</td>
-                        <td>{row["Promise Date"] || row["C"]}</td>
-                        <td>{row["Recd By Cigna"] || row["L"]}</td>
+                        <td>{formatExcelDate(row["Promise Date"] || row["C"])}</td>
+                        <td>{formatExcelDate(row["Recd By Cigna"] || row["L"])}</td>
                         <td>{row["System"] || row["Q"]}</td>
                         <td>{row["LPI?"] || row["BC"]}</td>
                         <td>{row["PG?"] || row["BD"]}</td>
