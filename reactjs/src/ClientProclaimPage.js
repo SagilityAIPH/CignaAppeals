@@ -37,7 +37,9 @@ function ClientProclaimPage() {
     const [latestProclaimDate, setLatestProclaimDate] = useState('');
 const [latestProclaimCounts, setLatestProclaimCounts] = useState({});
 const [trendView, setTrendView] = useState('Daily');
-
+const [pgYesRows, setPgYesRows] = useState([]);
+const [selectedPgGsp, setSelectedPgGsp] = useState('All');
+const [complianceView, setComplianceView] = useState('Daily');
 
 const processWorkbook = (workbook) => {
   const worksheet = workbook.Sheets['DATA'];
@@ -86,6 +88,9 @@ const processWorkbook = (workbook) => {
     summary.push(grandTotal);
     setGnbSummary(summary);
   }
+
+  const pgYes = json.filter(row => (row['PG?'] || '').trim().toUpperCase() === 'YES');
+setPgYesRows(pgYes);
 
   // ✅ Proclaim Appeals
   const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro'];
@@ -251,32 +256,45 @@ useEffect(() => {
   }
 }, []);
 
+    const filteredPgYesRows = useMemo(() => (
+  selectedPgGsp === 'All'
+    ? pgYesRows
+    : pgYesRows.filter(row => (row['Director'] || '').trim() === selectedPgGsp)
+), [selectedPgGsp, pgYesRows]);
 
-    const marqueeMessages = useMemo(() => [
-    `🚀 Welcome to the Proclaim Dashboard`,
-    ` `,
+const marqueeMessages = useMemo(() => [
+  `🚀 Welcome to the Proclaim Dashboard`,
+  ` `,
 
-      `As of ${new Date().toLocaleString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric',})}  12:00`,
-    ` `,
+  `As of ${new Date().toLocaleString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+  })}  12:00`,
+  ` `,
 
-    `🔢 Assigned : XXX  Completed:XX   Untouched: XX`,
-    `📊 Assigned: %  Completed: %   Untouched: %`,
-    ` `,
+  `🔢 Assigned : XXX  Completed:XX   Untouched: XX`,
+  `📊 Assigned: %  Completed: %   Untouched: %`,
 
-    `🔢 SG: Assigned: XX 📊 Completed: XX - %`,
-    `🔢 Wi: Assigned: XX 📊 Completed: XX - %`,
-    `🔢 CNX: Assigned: XX 📊 Completed: XX - %`,
+  `🔢 SG: Assigned: XX 📊 Completed: XX - %`,
+  ` `,
 
-    `🔢 Gold: Proclaim: XX % 📊 FAcets: XX - %`,
-    `🔢 BRZ: Proclaim: XX % 📊 FAcets: XX - %`,
-    ` `,
+  `🔢 Wi: Assigned: XX 📊 Completed: XX - %`,
+  ` `,
 
-    `📊 Total Pre-Service Appeals: ${filteredPreserviceRows.length}`,
-    `✅ Impact Summary Ready: ${impactSummary.length - 1} departments`,
-    `📅 Last Upload: ${new Date().toLocaleDateString()}`
-    
+  `🔢 CNX: Assigned: XX 📊 Completed: XX - %`,
+  ` `,
 
-    ], [filteredPreserviceRows, impactSummary]);
+  `🔢 Gold: Proclaim: XX % 📊 FAcets: XX - %`,
+  `🔢 BRZ: Proclaim: XX % 📊 FAcets: XX - %`,
+
+  `📊 Total Pre-Service Appeals: ${filteredPreserviceRows.length}`,
+  `📊 Total PG Appeals: ${filteredPgYesRows.length}`,
+
+  `✅ Impact Summary Ready: ${impactSummary.length - 1} departments`,
+  `📅 Last Upload: ${new Date().toLocaleDateString()}`
+], [filteredPreserviceRows, filteredPgYesRows, impactSummary]);
+
 
     const messagesPerSlide = 2; // 👈 Put this just above useEffect
 
@@ -319,6 +337,7 @@ useEffect(() => {
         return value || '';
     }
     };
+
 
 
 const generateImpactSummary = (data, statusFilter) => {
@@ -487,6 +506,7 @@ const transformedTrend = useMemo(() => {
         Wipro: {},
     };
 
+
     data.forEach((row) => {
         if (row['Claim System']?.trim().toLowerCase() !== 'proclaim') return;
 
@@ -523,6 +543,39 @@ const transformedTrend = useMemo(() => {
 
     setDirectorStats(formatted);
     };
+
+    const transformedComplianceTrend = useMemo(() => {
+  if (complianceView === 'Daily') return directorStats;
+
+  const groupByPeriod = (data, type) => {
+    const grouped = {};
+    data.forEach(({ date, YES, NO }) => {
+      const d = new Date(date);
+      let key = '';
+
+      if (type === 'Weekly') {
+        const startOfWeek = new Date(d);
+        startOfWeek.setDate(d.getDate() - d.getDay()); // Sunday
+        key = startOfWeek.toISOString().split('T')[0];
+      } else if (type === 'Monthly') {
+        key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      }
+
+      if (!grouped[key]) grouped[key] = { date: key, YES: 0, NO: 0 };
+      grouped[key].YES += YES || 0;
+      grouped[key].NO += NO || 0;
+    });
+    return Object.values(grouped).sort((a, b) => new Date(a.date) - new Date(b.date));
+  };
+
+  const result = {};
+  Object.entries(directorStats).forEach(([director, values]) => {
+    result[director] = groupByPeriod(values, complianceView);
+  });
+
+  return result;
+}, [complianceView, directorStats]);
+
 
 
   const barColors = { YES: '#F4817F', NO: '#3991D9' };
@@ -748,12 +801,36 @@ const orderedBucketColors = [
             Out of Compliance
             </h3>
 
+            <div style={{ marginBottom: '12px', marginLeft: '20px' }}>
+  <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+    View:
+  </label>
+  <select
+    value={complianceView}
+    onChange={(e) => setComplianceView(e.target.value)}
+    style={{
+      padding: '8px 12px',
+      borderRadius: '6px',
+      border: '1px solid #ccc',
+      fontSize: '14px',
+      width: '150px',
+      fontFamily: 'inherit',
+      color: '#003b70',
+      backgroundColor: '#fff',
+    }}
+  >
+    {['Daily', 'Weekly', 'Monthly'].map((opt) => (
+      <option key={opt} value={opt}>{opt}</option>
+    ))}
+  </select>
+</div>
+
             <div style={{
             display: 'flex',
             flexWrap: 'wrap',
             gap: '24px',
             }}>
-            {Object.entries(directorStats).map(([director, values]) => {
+            {Object.entries(transformedComplianceTrend).map(([director, values]) => {
                 const chartData = [
                 { label: 'YES', value: values.YES },
                 { label: 'NO', value: values.NO },
@@ -1077,6 +1154,126 @@ const orderedBucketColors = [
     </div>
   </div>
 )}
+
+
+{/* PG YES Section */}
+{pgYesRows.length > 0 && (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '20px',
+    fontFamily: 'Lexend, sans-serif',
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      PG Appeals
+    </h3>
+
+    <div style={{ marginBottom: '12px' }}>
+      <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+        Filter by GSP:
+      </label>
+      <select
+        value={selectedPgGsp}
+        onChange={(e) => setSelectedPgGsp(e.target.value)}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: '1px solid #ccc',
+          fontSize: '14px',
+          width: '150px',
+          fontFamily: 'inherit',
+          color: '#003b70',
+          backgroundColor: '#fff',
+        }}
+      >
+        {['All', 'Sagility', 'Concentrix', 'Wipro'].map((gsp) => (
+          <option key={gsp} value={gsp}>
+            {gsp}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: '#e8f0fe',
+      border: '1px solid #c4d4ec',
+      borderRadius: '8px',
+      padding: '16px',
+      marginBottom: '16px',
+      marginTop: '0px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
+    }}>
+      <div style={{
+        fontSize: '16px',
+        fontWeight: '600',
+        color: '#003b70'
+      }}>
+        Total PG Appeals: {filteredPgYesRows.length}
+      </div>
+    </div>
+
+    <div style={{ overflowX: 'auto', maxHeight: '400px', border: '1px solid #ddd', marginTop: '-10px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <thead style={{ backgroundColor: '#e0eafc', position: 'sticky', top: 0 }}>
+          <tr>
+            {Object.values(preserviceColumnMap).map((header) => (
+              <th key={header} style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
+                {header}
+              </th>
+            ))}
+            <th style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredPgYesRows.map((row, idx) => (
+            <tr key={idx}>
+              {Object.keys(preserviceColumnMap).map((excelKey) => (
+                <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
+                  {preserviceDateFields.includes(excelKey)
+                    ? formatExcelDate(row[excelKey])
+                    : (row[excelKey] ?? '')}
+                </td>
+              ))}
+              <td style={{ padding: '8px', border: '1px solid #eee' }}>
+                <button
+                  onClick={() => {
+                    setSelectedRow(row);
+                    setShowModal(true);
+                  }}
+                  style={{
+                    backgroundColor: '#0071ce',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  View
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
+
 
 
 {/* Gold & Bronze Section */}
