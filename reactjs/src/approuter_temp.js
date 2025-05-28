@@ -15,7 +15,7 @@ import AgentCasesPage from './AgentCasesPage';
 
 function AppRouter() {
   return (
-    <Router>
+    <Router basename='/LoginPage'>
       <Routes>
         <Route path="/" element={<LoginPage />} />
 
