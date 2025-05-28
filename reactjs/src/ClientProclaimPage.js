@@ -4,6 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, LabelList, ComposedChart, Line, Legend,
 } from "recharts";
+import { useLocation } from "react-router-dom";
 
 function ClientProclaimPage() {
     const [excelData, setExcelData] = useState([]);
@@ -35,6 +36,223 @@ function ClientProclaimPage() {
     const [rawImpactData, setRawImpactData] = useState([]);
     const [latestProclaimDate, setLatestProclaimDate] = useState('');
 const [latestProclaimCounts, setLatestProclaimCounts] = useState({});
+const [trendView, setTrendView] = useState('Daily');
+
+
+const processWorkbook = (workbook) => {
+  const worksheet = workbook.Sheets['DATA'];
+  if (!worksheet) {
+    alert('Sheet named "DATA" not found in Excel file.');
+    setIsLoading(false);
+    return;
+  }
+
+  const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+  setExcelData(json);
+
+  // ✅ Gold & Bronze (GnB)
+  const gnbSheet = workbook.Sheets['GnB'];
+  if (gnbSheet) {
+    const gnbData = XLSX.utils.sheet_to_json(gnbSheet, { defval: '' });
+    const departments = ['Sagility', 'Concentrix', 'Wipro'];
+    const grouped = {};
+    gnbData.forEach(row => {
+      const rawDept = (row['Owner Expense Center'] || '').trim();
+      const bucket = (row['Age Bucket'] || '').trim();
+      const matchedDept = departments.find(dep => rawDept.startsWith(dep));
+      if (matchedDept && bucket) {
+        if (!grouped[matchedDept]) grouped[matchedDept] = {};
+        grouped[matchedDept][bucket] = (grouped[matchedDept][bucket] || 0) + 1;
+      }
+    });
+    const allBuckets = Array.from(new Set(gnbData.map(row => (row['Age Bucket'] || '').trim()).filter(Boolean))).sort();
+    const summary = departments.map(dept => {
+      const counts = grouped[dept] || {};
+      const row = { Department: dept };
+      let total = 0;
+      allBuckets.forEach(bucket => {
+        const count = counts[bucket] || 0;
+        row[bucket] = count;
+        total += count;
+      });
+      row.Total = total;
+      return row;
+    });
+    const grandTotal = { Department: 'Total' };
+    allBuckets.forEach(bucket => {
+      grandTotal[bucket] = summary.reduce((sum, row) => sum + (row[bucket] || 0), 0);
+    });
+    grandTotal.Total = summary.reduce((sum, row) => sum + row.Total, 0);
+    summary.push(grandTotal);
+    setGnbSummary(summary);
+  }
+
+  // ✅ Proclaim Appeals
+  const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro'];
+  const proclaimAppeals = proclaimDirectors.map(director => {
+    const count = json.filter(row =>
+      (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
+      (row['Department'] || '').toLowerCase().includes('appeal') &&
+      (row['Director'] || '').trim() === director
+    ).length;
+    return { Department: director, Count: count };
+  });
+
+  const trendMap = {};
+  json.forEach(row => {
+    const system = (row['Claim System'] || '').trim().toLowerCase();
+    const department = (row['Department'] || '').toLowerCase();
+    const owner = (row['OwnerName'] || '').trim();
+    const status = (row['Status'] || '').trim().toLowerCase();
+    let rawDate = row['ReportDate'];
+    if (system !== 'proclaim' || !department.includes('appeal')) return;
+
+    let date = null;
+    if (typeof rawDate === 'number') {
+      date = new Date(Math.round((rawDate - 25569) * 86400 * 1000)).toISOString().split('T')[0];
+    } else if (rawDate instanceof Date) {
+      date = rawDate.toISOString().split('T')[0];
+    } else if (typeof rawDate === 'string' && rawDate.includes('/')) {
+      const parsed = new Date(rawDate);
+      if (!isNaN(parsed)) date = parsed.toISOString().split('T')[0];
+    }
+
+    if (!date) return;
+    if (!trendMap[date]) {
+      trendMap[date] = { date, Assigned: 0, Unassigned: 0, Open: 0, Pended: 0, Completed: 0 };
+    }
+    if (owner) trendMap[date].Assigned += 1;
+    else trendMap[date].Unassigned += 1;
+
+    if (['open', 'pended', 'completed'].includes(status)) {
+      trendMap[date][status.charAt(0).toUpperCase() + status.slice(1)] += 1;
+    }
+  });
+
+  const trendData = Object.values(trendMap).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const proclaimLatestDate = trendData.length > 0 ? trendData[trendData.length - 1].date : null;
+
+  const latestDateCounts = proclaimLatestDate
+    ? json.filter(row =>
+        (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
+        (row['Department'] || '').toLowerCase().includes('appeal') &&
+        (row['Director'] || '').trim() &&
+        new Date(formatExcelDate(row['ReportDate']))?.toISOString().split('T')[0] === proclaimLatestDate
+      ).reduce((acc, row) => {
+        const dir = (row['Director'] || '').trim();
+        if (proclaimDirectors.includes(dir)) acc[dir] = (acc[dir] || 0) + 1;
+        return acc;
+      }, {})
+    : {};
+
+  setProclaimSummary(proclaimAppeals);
+  setProclaimTrend(trendData);
+  setLatestProclaimDate(proclaimLatestDate);
+  setLatestProclaimCounts(latestDateCounts);
+
+  // ✅ IMPACT
+  const impactSheet = workbook.Sheets['IMPACT'];
+  if (impactSheet) {
+    const impactData = XLSX.utils.sheet_to_json(impactSheet, { defval: '' });
+    setImpactSummary(generateImpactSummary(impactData, impactStatusFilter));
+    setRawImpactData(impactData);
+  }
+
+  // ✅ Preservice
+  const preservice = json.filter(row => (row['Appeal_Category'] || '').trim() === 'Pre-Service');
+  setPreserviceRows(preservice);
+  if (preservice.length > 0) setPreserviceHeaders(Object.keys(preservice[0]));
+
+  // ✅ IFP
+  const ifpData = json.filter(row => (row['Account Name'] || '').trim() !== '');
+  setIfpRows(ifpData);
+
+  const ifpDepts = ['Sagility', 'Concentrix', 'Wipro'];
+  const ageBucketCol = 'AGE_BUCKET';
+  const groupCol = 'Director';
+  const groupedIFP = {};
+
+  ifpData.forEach(row => {
+    const director = (row[groupCol] || '').trim();
+    const bucket = (row[ageBucketCol] || '').trim();
+    if (ifpDepts.includes(director) && bucket) {
+      if (!groupedIFP[director]) groupedIFP[director] = {};
+      groupedIFP[director][bucket] = (groupedIFP[director][bucket] || 0) + 1;
+    }
+  });
+
+  const allIfpBuckets = Array.from(new Set(ifpData.map(row => (row[ageBucketCol] || '').trim())))
+    .filter(Boolean).sort();
+
+  const ifpSummaryData = ifpDepts.map(dept => {
+    const counts = groupedIFP[dept] || {};
+    const row = { Department: dept };
+    let total = 0;
+    allIfpBuckets.forEach(bucket => {
+      const count = counts[bucket] || 0;
+      row[bucket] = count;
+      total += count;
+    });
+    row.Total = total;
+    return row;
+  });
+
+  const ifpGrandTotal = { Department: 'Total' };
+  allIfpBuckets.forEach(bucket => {
+    ifpGrandTotal[bucket] = ifpSummaryData.reduce((sum, row) => sum + (row[bucket] || 0), 0);
+  });
+  ifpGrandTotal.Total = ifpSummaryData.reduce((sum, row) => sum + row.Total, 0);
+  ifpSummaryData.push(ifpGrandTotal);
+
+  setIfpSummary(ifpSummaryData);
+
+  // ✅ Director dropdown
+  const allowedDirectors = ['Sagility', 'Concentrix', 'Wipro'];
+  const directors = json
+    .map(row => (row['Director'] || '').trim())
+    .filter(name => allowedDirectors.includes(name));
+  const uniqueDirectors = Array.from(new Set(directors));
+  setDirectorOptions(['All', ...uniqueDirectors]);
+
+  setTimeout(() => {
+    calculateDirectorStats(json);
+    calculateFullyInsuredStats(json);
+    setIsLoading(false);
+    setShowMarquee(true);
+  }, 0);
+};
+
+
+
+const handleAutoUpload = () => {
+  setIsLoading(true);
+
+  fetch("/Appeals_Sample.xlsx")
+    .then(response => {
+      if (!response.ok) throw new Error("File not found");
+      return response.arrayBuffer();
+    })
+    .then(arrayBuffer => {
+      const data = new Uint8Array(arrayBuffer);
+      const workbook = XLSX.read(data, { type: "array" });
+      processWorkbook(workbook);
+    })
+    .catch(error => {
+      alert("Failed to load file from /public/Appeals_Sample.xlsx");
+      console.error(error);
+      setIsLoading(false);
+    });
+};
+
+useEffect(() => {
+  const shouldAutoLoad = localStorage.getItem("autoLoadProclaim");
+
+  if (shouldAutoLoad === "true") {
+    handleAutoUpload();                      // Trigger upload
+    localStorage.removeItem("autoLoadProclaim"); // Clear the flag so it doesn't repeat
+  }
+}, []);
+
 
     const marqueeMessages = useMemo(() => [
     `🚀 Welcome to the Proclaim Dashboard`,
@@ -142,267 +360,61 @@ const generateImpactSummary = (data, statusFilter) => {
 };
 
 
+const transformedTrend = useMemo(() => {
+  if (trendView === 'Daily') return proclaimTrend;
 
-    const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  const groupMap = {};
 
-    setIsLoading(true); // Start loading
+  proclaimTrend.forEach(row => {
+    const date = new Date(row.date);
+    let key = '';
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-
-     // ✅ Process Gold & Bronze (GnB) Sheet
-const gnbSheet = workbook.Sheets['GnB'];
-if (gnbSheet) {
-  const gnbData = XLSX.utils.sheet_to_json(gnbSheet, { defval: '' });
-
-  const departments = ['Sagility', 'Concentrix', 'Wipro'];
-  const grouped = {};
-
-  gnbData.forEach(row => {
-    const rawDept = (row['Owner Expense Center'] || '').trim();
-    const bucket = (row['Age Bucket'] || '').trim();
-
-    const matchedDept = departments.find(dep => rawDept.startsWith(dep));
-    if (matchedDept && bucket) {
-      if (!grouped[matchedDept]) grouped[matchedDept] = {};
-      grouped[matchedDept][bucket] = (grouped[matchedDept][bucket] || 0) + 1;
+    if (trendView === 'Weekly') {
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - date.getDay()); // Sunday start
+      key = weekStart.toISOString().split('T')[0];
+    } else if (trendView === 'Monthly') {
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     }
+
+    if (!groupMap[key]) {
+      groupMap[key] = {
+        date: key,
+        Assigned: 0,
+        Open: 0,
+        Pended: 0,
+        Completed: 0,
+        Unassigned: 0
+      };
+    }
+
+    groupMap[key].Assigned += row.Assigned || 0;
+    groupMap[key].Open += row.Open || 0;
+    groupMap[key].Pended += row.Pended || 0;
+    groupMap[key].Completed += row.Completed || 0;
+    groupMap[key].Unassigned += row.Unassigned || 0;
   });
 
-  // Find all unique buckets and sort them
-  const allBuckets = Array.from(new Set(
-    gnbData.map(row => (row['Age Bucket'] || '').trim()).filter(Boolean)
-  )).sort();
-
-  const summary = departments.map(dept => {
-    const counts = grouped[dept] || {};
-    const row = { Department: dept };
-    let total = 0;
-
-    allBuckets.forEach(bucket => {
-      const count = counts[bucket] || 0;
-      row[bucket] = count;
-      total += count;
-    });
-
-    row.Total = total;
-    return row;
-  });
-
-  // Grand Total row
-  const grandTotal = { Department: 'Total' };
-  allBuckets.forEach(bucket => {
-    grandTotal[bucket] = summary.reduce((sum, row) => sum + (row[bucket] || 0), 0);
-  });
-  grandTotal.Total = summary.reduce((sum, row) => sum + row.Total, 0);
-  summary.push(grandTotal);
-
-  setGnbSummary(summary);
-}
+  return Object.values(groupMap).sort((a, b) => new Date(a.date) - new Date(b.date));
+}, [proclaimTrend, trendView]);
 
 
-        const worksheet = workbook.Sheets['DATA'];
-        if (!worksheet) {
-        alert('Sheet named "DATA" not found in Excel file.');
-        setIsLoading(false);
-        return;
-        }
+  const handleFileUpload = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
 
-        const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-        setExcelData(json);
+  setIsLoading(true);
 
-// ✅ Proclaim Appeal Numbers
-const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro'];
-const proclaimAppeals = proclaimDirectors.map(director => {
-  const count = json.filter(row =>
-    (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
-    (row['Department'] || '').toLowerCase().includes('appeal') &&
-    (row['Director'] || '').trim() === director
-  ).length;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    processWorkbook(workbook);
+  };
 
-  return { Department: director, Count: count };
-});
+  reader.readAsArrayBuffer(file);
+};
 
-// 👇 Breakdown Proclaim Appeals by date and GSP
-const trendMap = {};
-json.forEach(row => {
-  const system = (row['Claim System'] || '').trim().toLowerCase();
-  const department = (row['Department'] || '').toLowerCase();
-  const director = (row['Director'] || '').trim();
-  let rawDate = row['ReportDate'];
-
-  if (system !== 'proclaim' || !department.includes('appeal') || !director) return;
-
-  let date = null;
-  if (typeof rawDate === 'number') {
-    date = new Date(Math.round((rawDate - 25569) * 86400 * 1000)).toISOString().split('T')[0];
-  } else if (rawDate instanceof Date) {
-    date = rawDate.toISOString().split('T')[0];
-  } else if (typeof rawDate === 'string' && rawDate.includes('/')) {
-    const parsed = new Date(rawDate);
-    if (!isNaN(parsed)) date = parsed.toISOString().split('T')[0];
-  }
-
-  if (!date) return;
-
-  if (!trendMap[date]) trendMap[date] = { date };
-  trendMap[date][director] = (trendMap[date][director] || 0) + 1;
-});
-
-const trendData = Object.values(trendMap).sort((a, b) => new Date(a.date) - new Date(b.date));
-const proclaimLatestDate = trendData.length > 0 ? trendData[trendData.length - 1].date : null;
-
-const latestDateCounts = proclaimLatestDate
-  ? json.filter(row =>
-      (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
-      (row['Department'] || '').toLowerCase().includes('appeal') &&
-      (row['Director'] || '').trim() &&
-      new Date(formatExcelDate(row['ReportDate']))?.toISOString().split('T')[0] === proclaimLatestDate
-    ).reduce((acc, row) => {
-      const dir = (row['Director'] || '').trim();
-      if (proclaimDirectors.includes(dir)) {
-        acc[dir] = (acc[dir] || 0) + 1;
-      }
-      return acc;
-    }, {})
-  : {};
-
-setProclaimSummary(proclaimAppeals);
-setProclaimTrend(trendData);
-setLatestProclaimDate(proclaimLatestDate);
-setLatestProclaimCounts(latestDateCounts);
-
-
-
-        // ✅ Add this right here — after reading "DATA"
-        const impactSheet = workbook.Sheets['IMPACT'];
-        if (impactSheet) {
-            const impactData = XLSX.utils.sheet_to_json(impactSheet, { defval: '' });
-
-            const departments = ['Concentrix', 'Sagility', 'Stateside', 'Wipro'];
-            const ageBuckets = ['0-15 days', '16-30 days', '31-60 days', '61+ days'];
-
-            const grouped = {};
-            departments.forEach(dept => {
-            grouped[dept] = Object.fromEntries(ageBuckets.map(bucket => [bucket, 0]));
-            });
-
-            impactData.forEach(row => {
-            const status = (row['Case status'] || '').trim().toLowerCase();
-            if (
-              impactStatusFilter !== 'All' &&
-              status !== impactStatusFilter.toLowerCase()
-            ) return;
-
-            const dept = row['helper_location2'];
-            const bucket = row['helper_AGE_bucket2'];
-            if (departments.includes(dept) && ageBuckets.includes(bucket)) {
-              grouped[dept][bucket]++;
-            }
-          });
-
-            const summary = departments.map(dept => {
-            const counts = grouped[dept];
-            const total = Object.values(counts).reduce((a, b) => a + b, 0);
-            return { Department: dept, ...counts, Total: total };
-            });
-
-            const grandTotal = { Department: 'Total' };
-            ageBuckets.forEach(bucket => {
-            grandTotal[bucket] = summary.reduce((sum, row) => sum + row[bucket], 0);
-            });
-            grandTotal.Total = summary.reduce((sum, row) => sum + row.Total, 0);
-            summary.push(grandTotal);
-            setImpactSummary(generateImpactSummary(impactData, impactStatusFilter));
-            setRawImpactData(impactData);
-        }
-
-        // Get Preservice rows and headers
-        const preservice = json.filter(row => (row['Appeal_Category'] || '').trim() === 'Pre-Service');
-        setPreserviceRows(preservice);
-
-
-        // ✅ IFP Rows and Summary
-const ifpData = json.filter(row => (row['Account Name'] || '').trim() !== '');
-setIfpRows(ifpData);
-
-const ifpDepts = ['Sagility', 'Concentrix', 'Wipro'];
-const ageBucketCol = 'AGE_BUCKET';
-const groupCol = 'Director';
-const countCol = 'Account Name';
-
-const groupedIFP = {};
-
-ifpData.forEach(row => {
-  const director = (row[groupCol] || '').trim();
-  const bucket = (row[ageBucketCol] || '').trim();
-
-  if (ifpDepts.includes(director) && bucket) {
-    if (!groupedIFP[director]) groupedIFP[director] = {};
-    groupedIFP[director][bucket] = (groupedIFP[director][bucket] || 0) + 1;
-  }
-});
-
-// Collect unique sorted buckets
-const allIfpBuckets = Array.from(new Set(ifpData.map(row => (row[ageBucketCol] || '').trim())))
-  .filter(Boolean).sort();
-
-const ifpSummaryData = ifpDepts.map(dept => {
-  const counts = groupedIFP[dept] || {};
-  const row = { Department: dept };
-  let total = 0;
-
-  allIfpBuckets.forEach(bucket => {
-    const count = counts[bucket] || 0;
-    row[bucket] = count;
-    total += count;
-  });
-
-  row.Total = total;
-  return row;
-});
-
-const ifpGrandTotal = { Department: 'Total' };
-allIfpBuckets.forEach(bucket => {
-  ifpGrandTotal[bucket] = ifpSummaryData.reduce((sum, row) => sum + (row[bucket] || 0), 0);
-});
-ifpGrandTotal.Total = ifpSummaryData.reduce((sum, row) => sum + row.Total, 0);
-ifpSummaryData.push(ifpGrandTotal);
-
-setIfpSummary(ifpSummaryData);
-
-
-        if (preservice.length > 0) {
-        const headers = Object.keys(preservice[0]);
-        setPreserviceHeaders(headers);
-        }
-
-          // 👇 Add this here
-const allowedDirectors = ['Sagility', 'Concentrix', 'Wipro'];
-
-const directors = json
-  .map(row => (row['Director'] || '').trim())
-  .filter(name => allowedDirectors.includes(name));
-
-const uniqueDirectors = Array.from(new Set(directors));
-
-setDirectorOptions(['All', ...uniqueDirectors]);
-
-        // Avoid blocking UI
-        setTimeout(() => {
-        calculateDirectorStats(json);
-        calculateFullyInsuredStats(json);
-        setIsLoading(false); // Done loading
-        setShowMarquee(true); // 👈 Add here
-        }, 0);
-    };
-
-    reader.readAsArrayBuffer(file);
-    };
 
     const regionLabels = {
     FI: 'Fully Insured',
@@ -550,32 +562,25 @@ const orderedBucketColors = [
 
   return (
     <div style={{ padding: '0px', fontFamily: 'Lexend, sans-serif' }}>
-      <label
-        htmlFor="excel-upload"
-        style={{
-          display: 'inline-block',
-          padding: '12px 24px',
-          backgroundColor: '#0071ce',
-          color: 'white',
-          borderRadius: '8px',
-          marginTop: '-10px',
-          marginBottom: '10px',
-          marginLeft: '-30px',
-          cursor: 'pointer',
-          fontWeight: '600',
-          fontSize: '14px',
-          letterSpacing: '0.5px',
-        }}
-      >
-        Upload Excel
-      </label>
-      <input
-        id="excel-upload"
-        type="file"
-        accept=".xlsx, .xls"
-        onChange={handleFileUpload}
-        style={{ display: 'none' }}
-      />
+      {/* <button
+  onClick={handleAutoUpload}
+  style={{
+    display: 'inline-block',
+    padding: '12px 24px',
+    backgroundColor: '#0071ce',
+    color: 'white',
+    borderRadius: '8px',
+    marginTop: '-10px',
+    marginBottom: '10px',
+    marginLeft: '-30px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '14px',
+    letterSpacing: '0.5px',
+  }}
+>
+  Load Proclaim File
+</button> */}
       
 {/* Marquee section */}
 {showMarquee && (
@@ -631,7 +636,7 @@ const orderedBucketColors = [
 
 {proclaimSummary.length > 0 && (
   <div style={{
-    marginTop: '20px',
+    marginTop: '0px',
     marginBottom: '20px',
     marginLeft: '-30px',
     backgroundColor: '#F5F6FA',
@@ -643,7 +648,8 @@ const orderedBucketColors = [
       fontSize: '19px',
       fontWeight: '500',
       color: '#003b70',
-      marginBottom: '10px'
+      marginBottom: '10px',
+      marginTop: '0px'
     }}>
       Proclaim Appeals Summary
     </h3>
@@ -671,6 +677,30 @@ const orderedBucketColors = [
 </div>
 </div>
 
+<div style={{ marginBottom: '12px' }}>
+  <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+    View:
+  </label>
+  <select
+    value={trendView}
+    onChange={(e) => setTrendView(e.target.value)}
+    style={{
+      padding: '8px 12px',
+      borderRadius: '6px',
+      border: '1px solid #ccc',
+      fontSize: '14px',
+      width: '150px',
+      fontFamily: 'inherit',
+      color: '#003b70',
+      backgroundColor: '#fff',
+    }}
+  >
+    {['Daily', 'Weekly', 'Monthly'].map((opt) => (
+      <option key={opt} value={opt}>{opt}</option>
+    ))}
+  </select>
+</div>
+
 
     <div style={{
       marginTop: '10px',
@@ -679,18 +709,29 @@ const orderedBucketColors = [
       padding: '24px',
       boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
     }}>
-      <ResponsiveContainer width="100%" height={220}>
-      <ComposedChart data={proclaimTrend}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-35} height={50} />
-        <YAxis allowDecimals={false} tick={{ fontSize: 13}}/>
-        <Tooltip />
-        <Legend />
-        <Line dataKey="Sagility" stroke="#42A5F5" strokeWidth={2} />
-        <Line dataKey="Concentrix" stroke="#FFA726" strokeWidth={2} />
-        <Line dataKey="Wipro" stroke="#66BB6A" strokeWidth={2} />
-      </ComposedChart>
-    </ResponsiveContainer>
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart data={transformedTrend}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" tick={{ fontSize: 11, dy: 19 }} angle={-35} height={50} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 13 }} />
+          <Tooltip />
+          <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 13 }} />
+
+          <Bar dataKey="Assigned" fill="#42A5F5">
+            <LabelList dataKey="Assigned" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="Open" fill="#00C49F">
+            <LabelList dataKey="Open" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="Pended" fill="#FFB300">
+            <LabelList dataKey="Pended" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="Completed" fill="#66BB6A">
+            <LabelList dataKey="Completed" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+
     </div>
   </div>
 )}

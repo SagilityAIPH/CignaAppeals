@@ -8,10 +8,16 @@ function ClientPage({ children }) {
   const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState(null); // 🆕
 
-  const handleNavClick = (path, itemKey) => {
-    setSelectedItem(itemKey);       // ✅ set clicked item
-    navigate(path);                 // ✅ navigate to path
-  };
+const handleNavClick = (path, itemKey) => {
+  setSelectedItem(itemKey);
+
+  // Step 1: Set auto-load flag if going to /client/proclaim
+  if (path === "/client/proclaim") {
+    localStorage.setItem("autoLoadProclaim", "true");
+  }
+
+  navigate(path);
+};
 
   return (
     <>
