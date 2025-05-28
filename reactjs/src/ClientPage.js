@@ -29,24 +29,29 @@ const handleNavClick = (path, itemKey) => {
     color: "white",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between", // Push items to opposite sides
-    padding: "0 24px", // Add space on left and right
+    justifyContent: "space-between",
+    padding: "0 24px",
     position: "fixed",
     top: 0,
     left: 0,
-    right: 0, // Ensure it stretches fully
+    right: 0,
     width: "100%",
     zIndex: 1100,
-    boxSizing: "border-box", // ✅ Ensure padding doesn’t overflow
-    overflow: "hidden", // ✅ Prevent children from spilling
+    boxSizing: "border-box",
+    overflow: "hidden",
   }}
 >
-  {/* Logo on the left */}
-  <img
-    src={`${process.env.PUBLIC_URL}/Cigna logo.png`}
-    alt="Cigna Logo"
-    style={{ height: "50px" }}
-  />
+  {/* Logo and Title on the left */}
+  <div style={{ display: "flex", alignItems: "center" }}>
+    <img
+      src={`${process.env.PUBLIC_URL}/Cigna logo.png`}
+      alt="Cigna Logo"
+      style={{ height: "50px", marginRight: "15px", }}
+    />
+    <span style={{ fontSize: "17px", fontWeight: '500', fontFamily: "'Lexend', sans-serif" ,  marginTop:"7px"}}>
+      Appeal Command Center
+    </span>
+  </div>
 
 </header>
 

@@ -11,15 +11,22 @@ function TeamLeadPage({ children }) {
   const loginState = JSON.parse(sessionStorage.getItem("loginState"));
   const managerName = loginState?.managerNameRaw || "User";
 
-  const handleNavClick = (path, itemKey) => {
-    setSelectedItem(itemKey);
-    navigate(path);
-  };
+const handleNavClick = (path, itemKey) => {
+  setSelectedItem(itemKey);
+
+  // 🆕 Set auto-load flag if navigating to Team Lead Cases
+  if (path === "/teamlead/teamlead-cases") {
+    localStorage.setItem("autoLoadTeamLead", "true");
+  }
+
+  navigate(path);
+};
 
   return (
     <>
     
       {/* Header */}
+{/* Header */}
 <header
   style={{
     height: "60px",
@@ -39,22 +46,28 @@ function TeamLeadPage({ children }) {
     overflow: "hidden",
   }}
 >
-  {/* Logo on the left */}
-  <img
-    src={`${process.env.PUBLIC_URL}/Cigna logo.png`}
-    alt="Cigna Logo"
-    style={{ height: "50px" }}
-  />
+  {/* Logo and Title on the left */}
+  <div style={{ display: "flex", alignItems: "center" }}>
+    <img
+      src={`${process.env.PUBLIC_URL}/Cigna logo.png`}
+      alt="Cigna Logo"
+      style={{ height: "50px", marginRight: "15px", }}
+    />
+    <span style={{ fontSize: "17px", fontWeight: '500', fontFamily: "'Lexend', sans-serif" ,  marginTop:"7px"}}>
+      Appeal Command Center
+    </span>
+  </div>
 
   {/* Welcome message on the right */}
-<div style={{ 
-  fontSize: "16px", 
-  fontWeight: "bold", 
-  fontFamily: "'Lexend', sans-serif" 
-}}>
-  Welcome, {managerName}
-</div>
+  <div style={{ 
+    fontSize: "16px", 
+    fontWeight: "bold", 
+    fontFamily: "'Lexend', sans-serif" 
+  }}>
+    Welcome, {managerName}
+  </div>
 </header>
+
 
 {/* Sidebar */}
 <div

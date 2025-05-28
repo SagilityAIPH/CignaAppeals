@@ -44,6 +44,102 @@ const [showReasonModal, setShowReasonModal] = useState(false);
 const [showAssignModal, setShowAssignModal] = useState(false);
 const [assignTo, setAssignTo] = useState('');
 
+
+useEffect(() => {
+  const autoLoadFlag = localStorage.getItem("autoLoadTeamLead");
+
+  if (autoLoadFlag === "true") {
+    localStorage.setItem("autoLoadTeamLead", "false");
+
+    // Auto-fetch from public Excel path
+    const fileUrl = process.env.PUBLIC_URL + '/Appeals_Sample.xlsx'; 
+  fetch(fileUrl)
+      .then((res) => res.arrayBuffer())
+      .then((buffer) => {
+        const data = new Uint8Array(buffer);
+        const workbook = XLSX.read(data, { type: "array" });
+
+        const dataSheet = workbook.Sheets["DATA"];
+        if (dataSheet) {
+          const json = XLSX.utils.sheet_to_json(dataSheet, {
+            defval: "",
+            raw: false,
+            header: 1,
+          });
+
+          if (json.length > 1) {
+            const [rawHeaders, ...rows] = json;
+            const normalizedHeaders = rawHeaders.map((h) =>
+              String(h || "").replace(/\s+/g, " ").trim()
+            );
+            const fixedData = rows.map((row) =>
+              Object.fromEntries(
+                normalizedHeaders.map((key, i) => [key, row[i] ?? ""])
+              )
+            );
+
+            setPreserviceRows(fixedData);
+            setPreserviceHeaders(normalizedHeaders);
+            // ✅ Build Total Appeals Summary (filtered by current manager)
+const departments = ['Sagility', 'Concentrix', 'Wipro'];
+const grouped = {};
+const bucketKey = 'AGE_BUCKET';
+const deptKey = 'Director';
+const managerKey = 'Manager';
+
+fixedData.forEach(row => {
+  const rawManager = (row[managerKey] || '').toLowerCase().trim();
+  const matchManager = rawManager === managerNameRaw.toLowerCase().trim();
+  if (!matchManager) return;
+
+  const rawDept = (row[deptKey] || '').trim();
+  const bucket = (row[bucketKey] || '').trim();
+  const matchedDept = departments.find(dep => rawDept === dep);
+
+  if (matchedDept && bucket) {
+    if (!grouped[matchedDept]) grouped[matchedDept] = {};
+    grouped[matchedDept][bucket] = (grouped[matchedDept][bucket] || 0) + 1;
+  }
+});
+
+const allBuckets = [
+  '0-14', '15-29', '30-44', '45-59',
+  '60-89', '90-179', '180-364', '365+'
+];
+
+const summary = departments.map(dept => {
+  const counts = grouped[dept] || {};
+  const row = { Department: dept };
+  let total = 0;
+
+  allBuckets.forEach(bucket => {
+    const count = counts[bucket] || 0;
+    row[bucket] = count;
+    total += count;
+  });
+
+  row.Total = total;
+  return row;
+});
+
+const grandTotal = { Department: 'Total' };
+allBuckets.forEach(bucket => {
+  grandTotal[bucket] = summary.reduce((sum, row) => sum + (row[bucket] || 0), 0);
+});
+grandTotal.Total = summary.reduce((sum, row) => sum + row.Total, 0);
+summary.push(grandTotal);
+
+setGnbSummary(summary);
+
+          }
+        }
+      })
+      .catch((err) => console.error("Failed to auto-load Excel:", err));
+  }
+}, []);
+
+
+
     // ✅ Reset to page 1 when filters change
     useEffect(() => {
     setCurrentPage(1);
@@ -328,7 +424,7 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
 
   return (
     <div style={{ padding: '0px', fontFamily: 'Lexend, sans-serif' }}>
-      <label
+      {/* <label
         htmlFor="excel-upload"
         style={{
           display: 'inline-block',
@@ -353,7 +449,7 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
         accept=".xlsx, .xls"
         onChange={handleFileUpload}
         style={{ display: 'none' }}
-      />
+      /> */}
 {/* <div style={{ marginTop: '10px', marginLeft: '-30px', fontWeight: '600', color: '#003b70' }}>
   Logged in as: {displayManagerName}
 </div> */}
@@ -364,7 +460,7 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
 {gnbSummary.length > 0 && (
   <div
     style={{
-      marginTop: '20px',
+      marginTop: '0px',
       marginLeft: '-30px',
       backgroundColor: '#F5F6FA',
       borderRadius: '10px',

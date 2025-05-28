@@ -222,8 +222,6 @@ const processWorkbook = (workbook) => {
   }, 0);
 };
 
-
-
 const handleAutoUpload = () => {
   setIsLoading(true);
   const fileUrl = process.env.PUBLIC_URL + '/Appeals_Sample.xlsx'; 
