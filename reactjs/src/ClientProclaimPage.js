@@ -226,8 +226,8 @@ const processWorkbook = (workbook) => {
 
 const handleAutoUpload = () => {
   setIsLoading(true);
-
-  fetch("/Appeals_Sample.xlsx")
+  const fileUrl = process.env.PUBLIC_URL + '/Appeals_Sample.xlsx'; 
+  fetch(fileUrl)
     .then(response => {
       if (!response.ok) throw new Error("File not found");
       return response.arrayBuffer();
