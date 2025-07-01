@@ -370,7 +370,7 @@ if (!validOwners.includes(owner)) return;
 {gnbSummary.length > 0 && (
   <div
     style={{
-      marginTop: '20px',
+      marginTop: '0px',
       marginLeft: '-30px',
       backgroundColor: '#F5F6FA',
       borderRadius: '10px',
@@ -387,86 +387,20 @@ if (!validOwners.includes(owner)) return;
         marginTop: '0px',
       }}
     >
-      Total Appeals Summary & Age Breakdown
+      Case Summary
     </h3>
 
     <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
       {/* Left Section: Table + Card */}
       <div style={{ flex: 1, minWidth: '450px', maxWidth: '650px' }}>
         {/* Scrollable Table */}
-        <div style={{ border: '1px solid #ddd', maxHeight: '300px', overflow: 'auto' }}>
-          <table
-            style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}
-          >
-            <thead style={{ backgroundColor: '#00bcd4', color: 'white' }}>
-              <tr>
-                <th
-                  style={{
-                    padding: '10px',
-                    border: '1px solid #ccc',
-                    textAlign: 'left',
-                  }}
-                >
-                  Department
-                </th>
-                {Object.keys(gnbSummary[0])
-                  .filter((key) => key !== 'Department')
-                  .map((bucket) => (
-                    <th
-                      key={bucket}
-                      style={{
-                        padding: '10px',
-                        border: '1px solid #ccc',
-                        textAlign: 'left',
-                      }}
-                    >
-                      {bucket}
-                    </th>
-                  ))}
-              </tr>
-            </thead>
-            <tbody>
-              {gnbSummary.map((row, idx) => (
-                <tr
-                  key={idx}
-                  style={{
-                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f3f6fb',
-                  }}
-                >
-                  <td
-                    style={{
-                      padding: '8px',
-                      border: '1px solid #eee',
-                      fontWeight: row.Department === 'Total' ? '600' : '400',
-                    }}
-                  >
-                    {row.Department}
-                  </td>
-                  {Object.keys(row)
-                    .filter((key) => key !== 'Department')
-                    .map((bucket) => (
-                      <td
-                        key={bucket}
-                        style={{
-                          padding: '8px',
-                          border: '1px solid #eee',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {row[bucket] > 0 ? row[bucket] : '-'}
-                      </td>
-                    ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        
 
         {/* Case Summary Card */}
 {/* Case Summary Card */}
 <div
   style={{
-    marginTop: '20px',
+    marginTop: '0px',
     backgroundColor: 'white',
     borderRadius: '12px',
     padding: '20px',
@@ -476,7 +410,7 @@ if (!validOwners.includes(owner)) return;
   }}
 >
   <h4 style={{ marginTop: '0px', marginBottom: '16px', color: '#003b70', fontWeight: '600' }}>
-    Case Summary
+    
   </h4>
 
   {(() => {
@@ -564,60 +498,9 @@ const ownedRows = preserviceRows.filter(
 
 
       {/* Chart - Right */}
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)',
-          minWidth: 0, // helps Flex grow/shrink properly
-        }}
-      >
-        <h3
-          style={{
-            fontSize: '18px',
-            fontWeight: '500',
-            color: '#003b70',
-            marginBottom: '24px',
-            borderBottom: '1px solid #ddd',
-            paddingBottom: '8px',
-            marginTop: '0px',
-          }}
-        >
-          Appeal Age Bucket Breakdown per GSP
-        </h3>
-
-        <ResponsiveContainer width="100%" height={295}>
-          <BarChart
-            data={gnbSummary.filter((row) => row.Department !== 'Total')}
-            margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="Department" tick={{ fontSize: 12 }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: '12px' }} />
-
-            {Object.keys(gnbSummary[0])
-              .filter((key) => key !== 'Department' && key !== 'Total')
-              .map((bucket, index) => (
-                <Bar key={bucket} dataKey={bucket} fill={getColorForBucket(index)}>
-                  <LabelList
-                    dataKey={bucket}
-                    position="top"
-                    style={{ fontSize: 10, fontWeight: 'bold' }}
-                  />
-                </Bar>
-              ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
     </div>
   </div>
 )}
-
-
 
 {/* Pre-Service Section */}
 {preserviceRows.length > 0 && (
@@ -1179,5 +1062,6 @@ const ownedRows = preserviceRows.filter(
     </div>
   );
 }
+
 
 export default AgentCasesPage;
