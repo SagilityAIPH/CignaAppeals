@@ -31,6 +31,84 @@ const location = useLocation();
 const [showCompletedModal, setShowCompletedModal] = useState(false);
 const [pendingReason, setPendingReason] = useState('');
 
+// ─── Auto-fetch Excel once ───────────────────────────────────────────────
+useEffect(() => {
+  // use a flag so we only load once, even if the component remounts
+  const autoLoadFlag = localStorage.getItem('autoLoadAgent');
+  if (autoLoadFlag === 'false') return;        // already fetched in this tab
+
+  localStorage.setItem('autoLoadAgent', 'false');   // mark as done
+
+  const fileUrl = `${process.env.PUBLIC_URL}/Appeals_Sample.xlsx`;
+
+  fetch(fileUrl)
+    .then(res => res.arrayBuffer())
+    .then(buffer => {
+      const data = new Uint8Array(buffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      const sheet = workbook.Sheets['DATA'];
+      if (!sheet) return;
+
+      const json = XLSX.utils.sheet_to_json(sheet, {
+        defval: '',
+        raw: false,
+        header: 1,
+      });
+
+      if (json.length <= 1) return;            // nothing but headers
+
+      // ── Normalise + map rows ───────────────────────────────────────────
+      const [rawHeaders, ...rows] = json;
+      const headers = rawHeaders.map(h => String(h || '').replace(/\s+/g, ' ').trim());
+      const fixedData = rows.map(r =>
+        Object.fromEntries(headers.map((key, i) => [key, r[i] ?? '']))
+      );
+
+      setPreserviceRows(fixedData);
+      setPreserviceHeaders(headers);
+
+      // ── Build G&B summary (same logic as before) ──────────────────────
+      const departments = ['Sagility', 'Concentrix', 'Wipro'];
+      const grouped = {};
+      const bucketKey = 'AGE_BUCKET';
+      const deptKey = 'Director';
+      const validOwners = ['SHARANAPPA', 'VEERESHA'];
+
+      fixedData.forEach(row => {
+        const owner = (row['OwnerName'] || '').trim().toUpperCase();
+        if (!validOwners.includes(owner)) return;
+
+        const dept = (row[deptKey] || '').trim();
+        const bucket = (row[bucketKey] || '').trim();
+        if (!departments.includes(dept) || !bucket) return;
+
+        grouped[dept] = grouped[dept] || {};
+        grouped[dept][bucket] = (grouped[dept][bucket] || 0) + 1;
+      });
+
+      const allBuckets = ['0-14','15-29','30-44','45-59','60-89','90-179','180-364','365+'];
+      const summary = departments.map(d => {
+        const counts = grouped[d] || {};
+        const row = { Department: d };
+        row.Total = allBuckets.reduce((t, b) => {
+          const c = counts[b] || 0;
+          row[b] = c;
+          return t + c;
+        }, 0);
+        return row;
+      });
+      const grandTotal = { Department: 'Total' };
+      allBuckets.forEach(b => grandTotal[b] = summary.reduce((s,r)=>s+(r[b]||0),0));
+      grandTotal.Total = summary.reduce((s,r)=>s+r.Total,0);
+      summary.push(grandTotal);
+
+      setGnbSummary(summary);
+    })
+    .catch(err => console.error('❌ Failed to auto-load Excel:', err));
+}, []);           // ← runs once on mount
+
+
     // ✅ Reset to page 1 when filters change
     useEffect(() => {
     setCurrentPage(1);
@@ -284,35 +362,7 @@ if (!validOwners.includes(owner)) return;
 
   return (
     <div style={{ padding: '0px', fontFamily: 'Lexend, sans-serif' }}>
-      <label
-        htmlFor="excel-upload"
-        style={{
-          display: 'inline-block',
-          padding: '12px 24px',
-          backgroundColor: '#0071ce',
-          color: 'white',
-          borderRadius: '8px',
-          marginTop: '-10px',
-          marginBottom: '10px',
-          marginLeft: '-30px',
-          cursor: 'pointer',
-          fontWeight: '600',
-          fontSize: '14px',
-          letterSpacing: '0.5px',
-        }}
-      >
-        Upload Excel
-      </label>
-      <input
-        id="excel-upload"
-        type="file"
-        accept=".xlsx, .xls"
-        onChange={handleFileUpload}
-        style={{ display: 'none' }}
-      />
-{/* <div style={{ marginTop: '10px', marginLeft: '-30px', fontWeight: '600', color: '#003b70' }}>
-  Logged in as: {displayManagerName}
-</div> */}
+ 
 
 
 
