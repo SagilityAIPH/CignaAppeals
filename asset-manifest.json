@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/CignaAppeals/static/js/main.4f5acd10.js",
+    "main.js": "/CignaAppeals/static/js/main.77f662dd.js",
     "index.html": "/CignaAppeals/index.html",
-    "main.4f5acd10.js.map": "/CignaAppeals/static/js/main.4f5acd10.js.map"
+    "main.77f662dd.js.map": "/CignaAppeals/static/js/main.77f662dd.js.map"
   },
   "entrypoints": [
-    "static/js/main.4f5acd10.js"
+    "static/js/main.77f662dd.js"
   ]
 }
