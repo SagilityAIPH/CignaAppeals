@@ -23,6 +23,8 @@ const handleLogin = (e) => {
     navigate('/client');
     } else if (username === 'agent' && password === '') {
   navigate('/agent');
+     } else if (username === 'poc' && password === '') {
+  navigate('/poc');
   } else if (password === '') {
     console.log("Sending login state:", loginState);
     navigate('/teamlead', { state: loginState });

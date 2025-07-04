@@ -9,6 +9,7 @@ import TeamLeadPage from './TeamLeadPage';
 import TeamLeadCasesPage from './TeamLeadCasesPage';
 import AgentPage from './AgentPage';
 import AgentCasesPage from './AgentCasesPage';
+import POCPage from './POCPage';
 
 
 // Future: import ManagerPage, AdminPage, etc.
@@ -30,6 +31,9 @@ function AppRouter() {
         </Route>
         <Route path="/agent" element={<AgentPage />}>
            <Route path="agent-cases" element={<AgentCasesPage />} />
+        </Route>
+        <Route path="/poc" element={<POCPage />}>
+           
         </Route>
       </Routes>
     </Router>
