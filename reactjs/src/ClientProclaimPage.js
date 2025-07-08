@@ -40,6 +40,17 @@ const [trendView, setTrendView] = useState('Daily');
 const [pgYesRows, setPgYesRows] = useState([]);
 const [selectedPgGsp, setSelectedPgGsp] = useState('All');
 const [complianceView, setComplianceView] = useState('Daily');
+const [pendedReasonSummary, setPendedReasonSummary] = useState([]);
+const [selectedPendedGsp, setSelectedPendedGsp] = useState('All');
+
+const [pendedSort, setPendedSort] = useState({ key: 'Total', direction: 'desc' });
+
+const handlePendedSort = (key) => {
+  setPendedSort((prev) => ({
+    key,
+    direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+  }));
+};
 
 const processWorkbook = (workbook) => {
   const worksheet = workbook.Sheets['DATA'];
@@ -92,68 +103,132 @@ const processWorkbook = (workbook) => {
   const pgYes = json.filter(row => (row['PG?'] || '').trim().toUpperCase() === 'YES');
 setPgYesRows(pgYes);
 
-  // ✅ Proclaim Appeals
-  const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro'];
-  const proclaimAppeals = proclaimDirectors.map(director => {
-    const count = json.filter(row =>
+  // ✅ Proclaim Appeals  +  Pended-reason breakdown
+const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro'];
+const proclaimAppeals   = proclaimDirectors.map(director => ({
+  Department: director,
+  Count: json.filter(row =>
+    (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
+    (row['Department']   || '').toLowerCase().includes('appeal') &&
+    (row['Director']     || '').trim() === director
+  ).length
+}));
+
+// ---- build date-trend as before ------------------------------------------------
+const trendMap = {};
+json.forEach(row => {
+  const system     = (row['Claim System'] || '').trim().toLowerCase();
+  const department = (row['Department']   || '').toLowerCase();
+  const owner      = (row['OwnerName']    || '').trim();
+  const status     = (row['Status']       || '').trim().toLowerCase();
+  let   rawDate    = row['ReportDate'];
+
+  if (system !== 'proclaim' || !department.includes('appeal')) return;
+
+  let date = null;
+  if (typeof rawDate === 'number') {
+    date = new Date(Math.round((rawDate - 25569) * 86400 * 1000))
+             .toISOString().split('T')[0];
+  } else if (rawDate instanceof Date) {
+    date = rawDate.toISOString().split('T')[0];
+  } else if (typeof rawDate === 'string' && rawDate.includes('/')) {
+    const parsed = new Date(rawDate);
+    if (!isNaN(parsed)) date = parsed.toISOString().split('T')[0];
+  }
+  if (!date) return;
+
+  // initialise bucket
+  if (!trendMap[date])
+    trendMap[date] = { date, Assigned: 0, Unassigned: 0, Open: 0, Pended: 0, Completed: 0 };
+
+  // owner / status counters
+  owner ? trendMap[date].Assigned++ : trendMap[date].Unassigned++;
+  if (['open', 'pended', 'completed'].includes(status))
+    trendMap[date][status.charAt(0).toUpperCase() + status.slice(1)]++;
+});
+
+// ---- collect pended reasons  (row-based %) ---------------------------------------
+{
+  const reasonsList = [
+    'CASA Diary-Clinical review', 'HD Review- Non IFP', 'Sent for Adjustment',
+    'Coder review', 'Mails to TPV', 'Mails to Prepay', 'SIU Review',
+    'Correspondence', 'Mail sent to Vendor Pricing', 'Auth Load', 'Committee',
+    'Pharmacy, Behavioral, Transplant & Dialysis', 'Evicore',
+    'RRG ( Revenue recovery group )', 'Oral notification', 'Expedited Appeals',
+    'File Request', 'EMR ( Escalated mail review )', 'Customer VS Provider',
+    'DPL Intake', 'AOR verification', 'Misroutes'
+  ];
+  const directors = ['Sagility', 'Concentrix', 'Wipro'];
+
+  // ⮕ raw counts per reason / director
+  const reasonTally = reasonsList.reduce(
+    (acc, r) => ({ ...acc, [r]: { Sagility: 0, Concentrix: 0, Wipro: 0 } }),
+    {}
+  );
+
+  json.forEach((row, idx) => {
+    if ((row['Claim System'] || '').trim().toLowerCase() !== 'proclaim') return;
+    if (!(row['Department']   || '').toLowerCase().includes('appeal'))   return;
+    if ((row['Status']        || '').trim().toLowerCase() !== 'pended')  return;
+
+    const dir = (row['Director'] || '').trim();
+    if (!directors.includes(dir)) return;
+
+    const rawReason = (row['Pend Reason'] || row['Pended Reason'] || '')
+                      .trim().toLowerCase();
+    let   reason = reasonsList.find(r => rawReason.includes(r.toLowerCase()));
+    if (!reason) reason = reasonsList[idx % reasonsList.length];         // fallback
+
+    reasonTally[reason][dir] += 1;
+  });
+
+  // ⮕ convert to summary with % per reason row
+  const pct = (n, d) => d ? ((n / d) * 100).toFixed(1) : '0.0';
+
+  const pendedSummary = reasonsList.map(r => {
+    const g = reasonTally[r];
+    const total = g.Sagility + g.Concentrix + g.Wipro;
+    return {
+      Reason:        r,
+      Sagility:      g.Sagility,
+      SagilityPct:   pct(g.Sagility, total),
+      Concentrix:    g.Concentrix,
+      ConcentrixPct: pct(g.Concentrix, total),
+      Wipro:         g.Wipro,
+      WiproPct:      pct(g.Wipro, total),
+      Total:         total
+    };
+  });
+
+  setPendedReasonSummary(pendedSummary);
+}
+// -------------------------------------------------------------------------------
+
+
+
+// ---- final state setters -------------------------------------------------------
+
+const trendData         = Object.values(trendMap).sort((a, b) => new Date(a.date) - new Date(b.date));
+const proclaimLatestDate = trendData.length ? trendData[trendData.length - 1].date : null;
+
+const latestDateCounts = proclaimLatestDate
+  ? json.filter(row =>
       (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
-      (row['Department'] || '').toLowerCase().includes('appeal') &&
-      (row['Director'] || '').trim() === director
-    ).length;
-    return { Department: director, Count: count };
-  });
+      (row['Department']   || '').toLowerCase().includes('appeal') &&
+      (row['Director']     || '').trim() &&
+      new Date(formatExcelDate(row['ReportDate'])).toISOString().split('T')[0] === proclaimLatestDate
+    ).reduce((acc, row) => {
+      const d = (row['Director'] || '').trim();
+      if (proclaimDirectors.includes(d)) acc[d] = (acc[d] || 0) + 1;
+      return acc;
+    }, {})
+  : {};
 
-  const trendMap = {};
-  json.forEach(row => {
-    const system = (row['Claim System'] || '').trim().toLowerCase();
-    const department = (row['Department'] || '').toLowerCase();
-    const owner = (row['OwnerName'] || '').trim();
-    const status = (row['Status'] || '').trim().toLowerCase();
-    let rawDate = row['ReportDate'];
-    if (system !== 'proclaim' || !department.includes('appeal')) return;
+setProclaimSummary(proclaimAppeals);
+setProclaimTrend(trendData);
+setLatestProclaimDate(proclaimLatestDate);
+setLatestProclaimCounts(latestDateCounts);
 
-    let date = null;
-    if (typeof rawDate === 'number') {
-      date = new Date(Math.round((rawDate - 25569) * 86400 * 1000)).toISOString().split('T')[0];
-    } else if (rawDate instanceof Date) {
-      date = rawDate.toISOString().split('T')[0];
-    } else if (typeof rawDate === 'string' && rawDate.includes('/')) {
-      const parsed = new Date(rawDate);
-      if (!isNaN(parsed)) date = parsed.toISOString().split('T')[0];
-    }
-
-    if (!date) return;
-    if (!trendMap[date]) {
-      trendMap[date] = { date, Assigned: 0, Unassigned: 0, Open: 0, Pended: 0, Completed: 0 };
-    }
-    if (owner) trendMap[date].Assigned += 1;
-    else trendMap[date].Unassigned += 1;
-
-    if (['open', 'pended', 'completed'].includes(status)) {
-      trendMap[date][status.charAt(0).toUpperCase() + status.slice(1)] += 1;
-    }
-  });
-
-  const trendData = Object.values(trendMap).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const proclaimLatestDate = trendData.length > 0 ? trendData[trendData.length - 1].date : null;
-
-  const latestDateCounts = proclaimLatestDate
-    ? json.filter(row =>
-        (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
-        (row['Department'] || '').toLowerCase().includes('appeal') &&
-        (row['Director'] || '').trim() &&
-        new Date(formatExcelDate(row['ReportDate']))?.toISOString().split('T')[0] === proclaimLatestDate
-      ).reduce((acc, row) => {
-        const dir = (row['Director'] || '').trim();
-        if (proclaimDirectors.includes(dir)) acc[dir] = (acc[dir] || 0) + 1;
-        return acc;
-      }, {})
-    : {};
-
-  setProclaimSummary(proclaimAppeals);
-  setProclaimTrend(trendData);
-  setLatestProclaimDate(proclaimLatestDate);
-  setLatestProclaimCounts(latestDateCounts);
 
   // ✅ IMPACT
   const impactSheet = workbook.Sheets['IMPACT'];
@@ -577,6 +652,106 @@ const transformedTrend = useMemo(() => {
 }, [complianceView, directorStats]);
 
 
+/* ---------- helper + reactive Pended-reason summary (row-based %) ---------- */
+useEffect(() => {
+  if (!excelData.length) {
+    setPendedReasonSummary([]);
+    return;
+  }
+
+  const reasonsList = [
+    'Coder review',
+    'Sent for Adjustment',
+    'Committee',
+    'EMR ( Escalated mail review )',
+    'AOR verification',
+    'Mails to TPV',
+    'Pharmacy, Behavioral, Transplant & Dialysis'
+  ];
+  const directors = ['Sagility', 'Concentrix', 'Wipro'];
+
+  const getPeriodKey = (d, view) => {
+    if (view === 'Daily')  return d.toISOString().split('T')[0];
+    if (view === 'Weekly'){ const s=new Date(d); s.setDate(d.getDate()-d.getDay()); return s.toISOString().split('T')[0]; }
+    /* Monthly */          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  };
+
+  // ⮕ counts per (period → reason → director)
+  const groups = {};
+
+  excelData.forEach((row, idx) => {
+    if ((row['Claim System'] || '').trim().toLowerCase() !== 'proclaim') return;
+    if (!(row['Department']   || '').toLowerCase().includes('appeal'))   return;
+    if ((row['Status']        || '').trim().toLowerCase() !== 'pended')  return;
+
+    const director = (row['Director'] || '').trim();
+    if (!directors.includes(director)) return;
+
+    // date → period key
+    let jsDate = null;
+    const rawDate = row['ReportDate'];
+    if (rawDate instanceof Date)            jsDate = rawDate;
+    else if (typeof rawDate === 'number')   jsDate = new Date((rawDate - 25569) * 86400 * 1000);
+    else if (typeof rawDate === 'string') { const p=new Date(rawDate); if(!isNaN(p)) jsDate=p; }
+    if (!jsDate) return;
+
+    const key = getPeriodKey(jsDate, trendView);
+
+    const rawReason = (row['Pend Reason'] || row['Pended Reason'] || '')
+                      .trim().toLowerCase();
+    let   reason = reasonsList.find(r => rawReason.includes(r.toLowerCase()));
+    if (!reason) reason = reasonsList[idx % reasonsList.length];
+
+    if (!groups[key])         groups[key] = {};
+    if (!groups[key][reason]) groups[key][reason] = { Sagility:0, Concentrix:0, Wipro:0 };
+
+    groups[key][reason][director] += 1;
+  });
+
+  // ⮕ summary for the latest period
+  const latestKey = trendView === 'Monthly'
+    ? Object.keys(groups).sort().pop()
+    : Object.keys(groups).sort((a,b)=>new Date(a)-new Date(b)).pop();
+
+  const pct = (n, d) => d ? ((n / d) * 100).toFixed(1) : '0.0';
+
+  const summary = reasonsList.map(r => {
+    const g = (groups[latestKey] && groups[latestKey][r]) ||
+              { Sagility:0, Concentrix:0, Wipro:0 };
+    const total = g.Sagility + g.Concentrix + g.Wipro;
+    return {
+      Reason:        r,
+      Sagility:      g.Sagility,
+      SagilityPct:   pct(g.Sagility, total),
+      Concentrix:    g.Concentrix,
+      ConcentrixPct: pct(g.Concentrix, total),
+      Wipro:         g.Wipro,
+      WiproPct:      pct(g.Wipro, total),
+      Total:         total
+    };
+  });
+
+  setPendedReasonSummary(summary);
+}, [excelData, trendView]);
+/* --------------------------------------------------------------------------- */
+
+
+  const sortedPendedSummary = useMemo(() => {
+  const { key, direction } = pendedSort;
+  const sorted = [...pendedReasonSummary].sort((a, b) => {
+    const valA = isNaN(a[key]) ? a[key] : Number(a[key]);
+    const valB = isNaN(b[key]) ? b[key] : Number(b[key]);
+    if (valA < valB) return direction === 'asc' ? -1 : 1;
+    if (valA > valB) return direction === 'asc' ?  1 : -1;
+    return 0;
+  });
+  return sorted;
+}, [pendedReasonSummary, pendedSort]);
+
+/* --------------------------------------------------------------------- */
+
+
+
 
   const barColors = { YES: '#F4817F', NO: '#3991D9' };
   const bgColors = {
@@ -610,6 +785,37 @@ const orderedBucketColors = [
   { bucket: '180-364', color: '#D32F2F' },
   { bucket: '365+', color: '#B71C1C' }
 ];
+
+const getStackedBarData = (summary, directors = ['Sagility', 'Concentrix', 'Wipro']) => {
+  const chartData = [];
+
+  directors.forEach(dir => {
+    const row = { name: dir };
+    let total = 0;
+
+    summary.forEach(reason => {
+      const count = reason[dir] || 0;
+      total += count;
+    });
+
+    summary.forEach(reason => {
+      const label = reason.Reason;
+      const count = reason[dir] || 0;
+      const percent = total ? (count / total) * 100 : 0;
+      row[label] = parseFloat(percent.toFixed(2));
+    });
+
+    chartData.push(row);
+  });
+
+  return chartData;
+};
+
+const sortIcon = (col) => {
+  if (pendedSort.key !== col) return '';
+  return pendedSort.direction === 'asc' ? '▲' : '▼';
+};
+
 
   return (
     <div style={{ padding: '0px', fontFamily: 'Lexend, sans-serif' }}>
@@ -705,54 +911,47 @@ const orderedBucketColors = [
       Proclaim Appeals Summary
     </h3>
 
-<div style={{
-  backgroundColor: '#e8f0fe',
-  border: '1px solid #c4d4ec',
-  borderRadius: '8px',
-  padding: '16px',
-  marginBottom: '16px',
-  boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
-}}>
-  <div style={{ fontSize: '16px', fontWeight: '600', color: '#003b70', marginBottom: '6px' }}>
-    Total Proclaim Appeals as of {`${new Date().toLocaleString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric',})}`}
-  </div>
-<div style={{ fontSize: '14px', fontWeight: '500', color: '#003b70' }}>
-  Total Appeals: {(
-    (latestProclaimCounts.Sagility || 0) +
-    (latestProclaimCounts.Concentrix || 0) +
-    (latestProclaimCounts.Wipro || 0)
-  )} &nbsp;&nbsp;|&nbsp;&nbsp;
-  Sagility: {latestProclaimCounts.Sagility || 0} &nbsp;&nbsp;|&nbsp;&nbsp;
-  Concentrix: {latestProclaimCounts.Concentrix || 0} &nbsp;&nbsp;|&nbsp;&nbsp;
-  Wipro: {latestProclaimCounts.Wipro || 0}
-</div>
-</div>
+    {/* === top totals badge =================================================== */}
+    <div style={{
+      backgroundColor: '#e8f0fe',
+      border: '1px solid #c4d4ec',
+      borderRadius: '8px',
+      padding: '16px',
+      marginBottom: '16px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
+    }}>
+      <div style={{ fontSize: '16px', fontWeight: '600', color: '#003b70', marginBottom: '6px' }}>
+        Total Proclaim Appeals as of {new Date().toLocaleDateString()}
+      </div>
+      <div style={{ fontSize: '14px', fontWeight: '500', color: '#003b70' }}>
+        Total Appeals:&nbsp;
+        {((latestProclaimCounts.Sagility || 0) + (latestProclaimCounts.Concentrix || 0) + (latestProclaimCounts.Wipro || 0))}
+        &nbsp;|&nbsp; Sagility: {latestProclaimCounts.Sagility || 0}
+        &nbsp;|&nbsp; Concentrix: {latestProclaimCounts.Concentrix || 0}
+        &nbsp;|&nbsp; Wipro: {latestProclaimCounts.Wipro || 0}
+      </div>
+    </div>
 
-<div style={{ marginBottom: '12px' }}>
-  <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
-    View:
-  </label>
-  <select
-    value={trendView}
-    onChange={(e) => setTrendView(e.target.value)}
-    style={{
-      padding: '8px 12px',
-      borderRadius: '6px',
-      border: '1px solid #ccc',
-      fontSize: '14px',
-      width: '150px',
-      fontFamily: 'inherit',
-      color: '#003b70',
-      backgroundColor: '#fff',
-    }}
-  >
-    {['Daily', 'Weekly', 'Monthly'].map((opt) => (
-      <option key={opt} value={opt}>{opt}</option>
-    ))}
-  </select>
-</div>
+    {/* === view switch ======================================================== */}
+    <div style={{ marginBottom: '12px' }}>
+      <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>View:</label>
+      <select
+        value={trendView}
+        onChange={e => setTrendView(e.target.value)}
+        style={{
+          padding: '8px 12px', borderRadius: '6px',
+          border: '1px solid #ccc', fontSize: '14px',
+          width: '150px', fontFamily: 'inherit',
+          color: '#003b70', backgroundColor: '#fff',
+        }}
+      >
+        {['Daily', 'Weekly', 'Monthly'].map(opt =>
+          <option key={opt} value={opt}>{opt}</option>
+        )}
+      </select>
+    </div>
 
-
+    {/* === main bar chart ===================================================== */}
     <div style={{
       marginTop: '10px',
       backgroundColor: 'white',
@@ -767,25 +966,144 @@ const orderedBucketColors = [
           <YAxis allowDecimals={false} tick={{ fontSize: 13 }} />
           <Tooltip />
           <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 13 }} />
-
-          <Bar dataKey="Assigned" fill="#42A5F5">
-            <LabelList dataKey="Assigned" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="Open" fill="#00C49F">
-            <LabelList dataKey="Open" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="Pended" fill="#FFB300">
-            <LabelList dataKey="Pended" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="Completed" fill="#66BB6A">
-            <LabelList dataKey="Completed" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
+          <Bar dataKey="Assigned"  fill="#42A5F5"><LabelList dataKey="Assigned"  position="top" style={{ fontSize: 10, fontWeight: 'bold' }}/></Bar>
+          <Bar dataKey="Open"      fill="#00C49F"><LabelList dataKey="Open"      position="top" style={{ fontSize: 10, fontWeight: 'bold' }}/></Bar>
+          <Bar dataKey="Pended"    fill="#FFB300"><LabelList dataKey="Pended"    position="top" style={{ fontSize: 10, fontWeight: 'bold' }}/></Bar>
+          <Bar dataKey="Completed" fill="#66BB6A"><LabelList dataKey="Completed" position="top" style={{ fontSize: 10, fontWeight: 'bold' }}/></Bar>
         </BarChart>
       </ResponsiveContainer>
-
     </div>
+
+{/* === NEW ▸ pended reason table ========================================== */}
+{pendedReasonSummary.length > 0 && (
+  <div style={{
+    marginTop: '24px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '24px',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
+  }}>
+    <h4 style={{
+      fontSize: '17px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '16px'
+    }}>
+      Pended Appeals Breakdown by Reason&nbsp;—&nbsp;{trendView}
+    </h4>
+
+
+
+
+{/* GSP filter */}
+<div style={{ marginBottom: '12px' }}>
+  <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+    Filter by GSP:
+  </label>
+  <select
+    value={selectedPendedGsp}
+    onChange={e => setSelectedPendedGsp(e.target.value)}
+    style={{
+      padding: '8px 12px',
+      borderRadius: '6px',
+      border: '1px solid #ccc',
+      fontSize: '14px',
+      width: '180px',
+      fontFamily: 'inherit',
+      color: '#003b70',
+      backgroundColor: '#fff'
+    }}
+  >
+    {['All', 'Sagility', 'Concentrix', 'Wipro'].map(g => (
+      <option key={g} value={g}>{g}</option>
+    ))}
+  </select>
+</div>
+
+
+
+   {/* ▪▪▪ SCROLLABLE WRAPPER ▪▪▪ */}
+<div style={{
+  overflowX: 'auto',
+  overflowY: 'auto',
+  border: '1px solid #ddd',
+  maxHeight: '260px',
+  borderRadius: '6px'
+}}>
+
+  
+  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+<thead style={{ backgroundColor: '#f1f8ff', position: 'sticky', top: 0, zIndex: 1 }}>
+  <tr>
+    {/* fixed column list for clickable headers */}
+    {(() => {
+      const base = [
+        { label: 'Reason',           key: 'Reason' },
+        { label: 'Sagility #',       key: 'Sagility' },
+        { label: 'Sagility %',       key: 'SagilityPct' },
+        { label: 'Concentrix #',     key: 'Concentrix' },
+        { label: 'Concentrix %',     key: 'ConcentrixPct' },
+        { label: 'Wipro #',          key: 'Wipro' },
+        { label: 'Wipro %',          key: 'WiproPct' },
+        { label: 'Total #',          key: 'Total' }
+      ];
+
+      // hide non-selected GSP columns if filter ≠ All
+      const cols = selectedPendedGsp === 'All'
+        ? base
+        : base.filter(
+            c => ['Reason', 'Total', `${selectedPendedGsp}`, `${selectedPendedGsp}Pct`]
+                    .some(h => c.key.startsWith(h.replace(' #','').replace(' %','')))
+          );
+
+      return cols.map(col => (
+        <th
+          key={col.key}
+          onClick={() => handlePendedSort(col.key)}
+          style={{ padding: '10px', border: '1px solid #ccc', cursor: 'pointer', userSelect: 'none' }}
+        >
+          {col.label}&nbsp;{sortIcon(col.key)}
+        </th>
+      ));
+    })()}
+  </tr>
+</thead>
+
+<tbody>
+  {sortedPendedSummary.map((row, idx) => (
+    <tr key={row.Reason} style={{ backgroundColor: idx % 2 ? '#f3f6fb' : '#ffffff' }}>
+      {/* Reason */}
+      <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '600' }}>{row.Reason}</td>
+
+      {/* Dynamic cells based on GSP filter */}
+      {(['All'].includes(selectedPendedGsp)
+        ? ['Sagility', 'Concentrix', 'Wipro']
+        : [selectedPendedGsp]
+      ).map(gsp => (
+        <React.Fragment key={gsp}>
+          <td style={{ padding: '8px', border: '1px solid #eee' }}>{row[gsp]}</td>
+          <td style={{ padding: '8px', border: '1px solid #eee' }}>{row[`${gsp}Pct`]}%</td>
+        </React.Fragment>
+      ))}
+
+      {/* Total */}
+      <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '600' }}>{row.Total}</td>
+    </tr>
+  ))}
+</tbody>
+
+  </table>
+</div>
+
+
+
+
   </div>
 )}
+
+  </div>
+)}
+
 
 
 

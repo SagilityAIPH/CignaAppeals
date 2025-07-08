@@ -523,7 +523,7 @@ const ownedRows = preserviceRows.filter(
     </h3>
 
 
-<div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+{/* <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
   <div>
     <label style={{ fontWeight: '500', color: '#003b70', display: 'block', marginBottom: '4px' }}>
       Filter By Column:
@@ -581,7 +581,7 @@ const ownedRows = preserviceRows.filter(
 })()}
     </select>
   </div>
-</div>
+</div> */}
 
 
 <div style={{
@@ -931,19 +931,44 @@ const ownedRows = preserviceRows.filter(
     >
       <h3 style={{ marginTop: 0, color: '#003b70' }}>Confirm Pended Status</h3>
       <p>Please provide a reason for marking the selected {selectedRows.length} case(s) as <strong>Pended</strong>:</p>
-      <textarea
-        value={pendingReason}
-        onChange={(e) => setPendingReason(e.target.value)}
-        placeholder="Enter reason for pending..."
-        style={{
-          width: '100%',
-          height: '100px',
-          marginTop: '10px',
-          padding: '10px',
-          borderRadius: '6px',
-          border: '1px solid #ccc'
-        }}
-      />
+        {/* Reason dropdown */}
+        <select
+          value={pendingReason}
+          onChange={(e) => setPendingReason(e.target.value)}
+          style={{
+            width: '100%',
+            marginTop: '10px',
+            padding: '10px',
+            borderRadius: '6px',
+            border: '1px solid #ccc'
+          }}
+        >
+          <option value="">-- Select Reason --</option>
+          <option value="AOR verification">AOR verification</option>
+          <option value="Auth Load">Auth Load</option>
+          <option value="CASA Diary-Clinical review">CASA Diary-Clinical review</option>
+          <option value="Coder review">Coder review</option>
+          <option value="Committee">Committee</option>
+          <option value="Correspondence">Correspondence</option>
+          <option value="Customer VS Provider">Customer VS Provider</option>
+          <option value="DPL Intake">DPL Intake</option>
+          <option value="EMR ( Escalated mail review )">EMR ( Escalated mail review )</option>
+          <option value="Evicore">Evicore</option>
+          <option value="Expedited Appeals">Expedited Appeals</option>
+          <option value="File Request">File Request</option>
+          <option value="HD Review- Non IFP">HD Review- Non IFP</option>
+          <option value="Mail sent to Vendor Pricing">Mail sent to Vendor Pricing</option>
+          <option value="Mails to Prepay">Mails to Prepay</option>
+          <option value="Mails to TPV">Mails to TPV</option>
+          <option value="Misroutes">Misroutes</option>
+          <option value="Pathwell">Pathwell</option>
+          <option value="Oral notification">Oral notification</option>
+          <option value="Pharmacy, Behavioral, Transplant & Dialysis">Pharmacy, Behavioral, Transplant & Dialysis</option>
+          <option value="RRG ( Revenue recovery group )">RRG ( Revenue recovery group )</option>
+          <option value="Sent for Adjustment">Sent for Adjustment</option>
+          <option value="SIU Review">SIU Review</option>
+          
+        </select>
       <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
         <button
           onClick={() => setShowPendingModal(false)}

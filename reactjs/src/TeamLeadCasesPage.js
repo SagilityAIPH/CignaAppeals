@@ -33,17 +33,22 @@ const managerName =
     const [preserviceHeaders, setPreserviceHeaders] = useState([]);
     const [selectedRow, setSelectedRow] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [selectedGsp, setSelectedGsp] = useState('All');
     const [gnbSummary, setGnbSummary] = useState([]);
-    const [filterColumn, setFilterColumn] = useState('');
-    const [filterValue, setFilterValue] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);
-    const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Open' | 'Completed'
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
-const [showReasonModal, setShowReasonModal] = useState(false);
-const [showAssignModal, setShowAssignModal] = useState(false);
-const [assignTo, setAssignTo] = useState('');
 
+// 👉 Pended-reason modal
+const [showPendReasonModal, setShowPendReasonModal] = useState(false);
+const [pendReasonText, setPendReasonText] = useState('');
+
+const [showAssignModal, setShowAssignModal] = useState(false);
+// multiple agents can be selected
+const [assignTo, setAssignTo] = useState([]);   // array of OwnerName strings
+
+const [caseStatusFilter, setCaseStatusFilter] = useState('All');
+
+// --- Helper: is this row already ASSIGNED? ---
+const isRowAssigned = (row) => getOwnerHelperValue(row) === 'ASSIGNED';
 
 useEffect(() => {
   const autoLoadFlag = localStorage.getItem("autoLoadTeamLead");
@@ -139,16 +144,11 @@ setGnbSummary(summary);
 }, []);
 
 
-
-    // ✅ Reset to page 1 when filters change
-    useEffect(() => {
-    setCurrentPage(1);
-    }, [filterColumn, filterValue, selectedGsp]);
-
-  const preserviceAllowedHeaders = [
-    'AGE', 'SR.', 'Manager', 'PROMISE', 'Task Promise Date', 'Rec\'d',
-    'System', 'LPI?', 'PG?', 'PG Name', 'OwnerID', 'Owner'
-  ];
+const preserviceAllowedHeaders = [
+  'AGE', 'SR.', 'Manager', 'PROMISE', 'Task Promise Date', 'Rec\'d',
+  'System', 'LPI?', 'PG?', 'PG Name', 'OwnerID', 'Owner',
+  'Case Status'              // 🔸 new display header
+];
 
 const preserviceColumnMap = {
   'Age Cal': 'AGE',
@@ -162,15 +162,26 @@ const preserviceColumnMap = {
   'PG?': 'PG?',
   'PG NAME2': 'PG Name',
   'OwnerID': 'OwnerID',
-  'OwnerName': 'Owner'
+  'OwnerName': 'Owner',
+  'Status': 'Case Status',          // 🔸 NEW: Excel column DN
 };
   
 const resolveExcelHeader = (friendlyHeader) => {
-  const found = Object.entries(preserviceColumnMap).find(
+  // Try forward map
+  const forward = Object.entries(preserviceColumnMap).find(
     ([excelKey, displayName]) =>
       displayName.trim().toLowerCase() === friendlyHeader.trim().toLowerCase()
   );
-  return found?.[0] || friendlyHeader;
+  if (forward) return forward[0];
+
+  // Try reverse (user picked Excel field name directly)
+  const reverse = Object.entries(preserviceColumnMap).find(
+    ([excelKey, displayName]) =>
+      excelKey.trim().toLowerCase() === friendlyHeader.trim().toLowerCase()
+  );
+  if (reverse) return reverse[0];
+
+  return friendlyHeader;
 };
 
   const getColorForBucket = (index) => {
@@ -216,32 +227,14 @@ const getOwnerHelperValue = (row) => {
 };
 
 
+
+// === Filter rows by manager + Case Status ===
 const filteredPreserviceRows = useMemo(() => {
-
-
-  let result = preserviceRows.filter(row => {
-    const status = getOwnerHelperValue(row);
-
-switch (statusFilter) {
-  case 'All':
-    return true;
-  case 'ASSIGNED':
-    return status === 'ASSIGNED';
-  case 'UNASSIGNED':
-    return status === 'UNASSIGNED' || status === '';
-  case 'PENDED':
-    return status === 'PENDED';
-  case 'COMPLETED':
-    return status === 'COMPLETED';
-  default:
-    return true;
-}
-
-  });
-
-  // Filter by Manager
-  result = result.filter(row => {
-    const managerKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'manager');
+  return preserviceRows.filter((row) => {
+    /* ---------- Manager filter (always on) ---------- */
+    const managerKey = Object.keys(row).find(
+      (k) => k.trim().toLowerCase() === 'manager'
+    );
     if (!managerKey) return false;
 
     const rawManager = String(row[managerKey] || '')
@@ -249,33 +242,19 @@ switch (statusFilter) {
       .trim()
       .toLowerCase();
 
-    return rawManager === managerName?.toLowerCase();
+    const managerMatch = rawManager === managerName?.toLowerCase();
+    if (!managerMatch) return false;
+
+    /* ---------- Case Status filter ---------- */
+    if (caseStatusFilter === 'All') return true;
+
+    const statusValue = String(row['Status'] || '').trim(); // Excel key
+    return statusValue === caseStatusFilter;
   });
+}, [preserviceRows, managerName, caseStatusFilter]);
 
-  // Filter by selectedGsp (Director)
-  if (selectedGsp !== 'All') {
-    result = result.filter(row => (row['Director'] || '').trim() === selectedGsp);
-  }
 
-  // Filter by column + value
-  if (filterColumn && filterValue) {
-    const actualKey = resolveExcelHeader(filterColumn);
-    const selectedValues = filterValue
-      .split(',')
-      .map(s => s.trim().toUpperCase())
-      .filter(Boolean);
 
-    result = result.filter(row => {
-      const raw = row[actualKey];
-      if (!raw) return false;
-
-      const rowValue = String(raw).toUpperCase();
-      return selectedValues.some(val => rowValue.includes(val));
-    });
-  }
-
-  return result;
-}, [preserviceRows, managerName, selectedGsp, filterColumn, filterValue, statusFilter]);
 
 
 
@@ -287,36 +266,77 @@ const paginatedRows = filteredPreserviceRows.slice(
   currentPage * rowsPerPage
 );
 
-// ⬇️ INSERT THIS HERE
-const managerCasesWithStatus = useMemo(() => {
-  return preserviceRows
-    .filter(r => (r['Manager'] || '').trim().toLowerCase() === managerNameRaw.trim().toLowerCase())
-    .map(r => ({
-      ...r,
-      _STATUS: getOwnerHelperValue(r)
-    }));
+// --- Are ALL selectable rows on this page already checked? ---
+const selectableRows = paginatedRows.filter((r) => !isRowAssigned(r));
+
+const isAllSelected =
+  selectableRows.length > 0 &&
+  selectableRows.every((row) =>
+    selectedRows.some((sel) => sel['SR'] === row['SR'])
+  );
+
+
+
+// === Case-summary stats (Open / Pended / Completed + Assigned / Unassigned) ===
+const caseSummaryStats = useMemo(() => {
+  const rows = preserviceRows.filter(
+    (r) => (r['Manager'] || '').trim().toLowerCase() === managerNameRaw.trim().toLowerCase()
+  );
+
+  let open = 0,
+    pended = 0,
+    completed = 0,
+    assigned = 0,
+    unassigned = 0;
+
+  rows.forEach((r) => {
+    /* ---- Case Status counts ---- */
+    const cs = String(r['Status'] || '').trim().toUpperCase();
+    if (cs === 'OPEN') open++;
+    else if (cs === 'PENDED') pended++;
+    else if (cs === 'COMPLETED') completed++;
+
+    /* ---- Assignment counts ---- */
+    const helper = getOwnerHelperValue(r); // ASSIGNED / '' / PENDED / COMPLETED etc.
+    if (helper === 'ASSIGNED') assigned++;
+    else if (helper === '' || helper === 'UNASSIGNED') unassigned++;
+  });
+
+  const total = rows.length;
+  const completionRate = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  return { total, open, pended, completed, assigned, unassigned, completionRate };
 }, [preserviceRows, managerNameRaw]);
 
-const isAllSelected = paginatedRows.length > 0 && paginatedRows.every(row =>
-  selectedRows.some(selected => selected['SR'] === row['SR'])
-);
 
+// --- Header checkbox toggle ---
 const toggleSelectAll = () => {
   if (isAllSelected) {
-    setSelectedRows([]);
+    // remove only selectable rows
+    setSelectedRows((prev) =>
+      prev.filter((sel) => isRowAssigned(sel))
+    );
   } else {
-    setSelectedRows(paginatedRows);
+    // add all selectable rows
+    setSelectedRows((prev) => [
+      ...prev.filter((sel) => isRowAssigned(sel)),
+      ...selectableRows,
+    ]);
   }
 };
 
+// --- Row checkbox toggle ---
 const toggleRowSelection = (row) => {
-  const exists = selectedRows.some(selected => selected['SR'] === row['SR']);
-  if (exists) {
-    setSelectedRows(prev => prev.filter(selected => selected['SR'] !== row['SR']));
-  } else {
-    setSelectedRows(prev => [...prev, row]);
-  }
+  if (isRowAssigned(row)) return; // ignore clicks on ASSIGNED rows
+
+  setSelectedRows((prev) => {
+    const exists = prev.some((sel) => sel['SR'] === row['SR']);
+    return exists
+      ? prev.filter((sel) => sel['SR'] !== row['SR'])
+      : [...prev, row];
+  });
 };
+
 
 
 
@@ -552,59 +572,98 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
           </table>
         </div>
 
-        {/* Case Summary Card */}
-        <div style={{ marginTop: '20px', backgroundColor: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', width: '93.3%', fontSize: '14px' }}>
-  <h4 style={{ marginTop: '0px', marginBottom: '16px', color: '#003b70', fontWeight: '600' }}>
+        {/* === Case Summary Card (updated) === */}
+<div
+  style={{
+    marginTop: '20px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+    width: '93.3%',
+    fontSize: '14px'
+  }}
+>
+  <h4
+    style={{
+      marginTop: '0px',
+      marginBottom: '16px',
+      color: '#003b70',
+      fontWeight: '600'
+    }}
+  >
     Case Summary
   </h4>
 
-  {(() => {
-const total = managerCasesWithStatus.length;
-const completed = managerCasesWithStatus.filter(r => r._STATUS === 'COMPLETED').length;
-const pended = managerCasesWithStatus.filter(r => r._STATUS === 'PENDED').length;
-const assigned = managerCasesWithStatus.filter(r => r._STATUS === 'ASSIGNED').length;
-const unassigned = total - completed - pended - assigned;
+  {/* --- Totals --- */}
+  <div style={{ marginBottom: '8px' }}>
+    <span role="img" aria-label="folder">📁</span> Total Cases:{' '}
+    <strong>{caseSummaryStats.total}</strong>
+  </div>
 
+  {/* --- Case Status counts --- */}
+  <div style={{ marginBottom: '8px' }}>
+    <span role="img" aria-label="loop">🔄</span> Open:{' '}
+    <strong>{caseSummaryStats.open}</strong>
+  </div>
+  <div style={{ marginBottom: '8px' }}>
+    <span role="img" aria-label="pending">🟡</span> Pended:{' '}
+    <strong>{caseSummaryStats.pended}</strong>
+  </div>
+  <div style={{ marginBottom: '8px' }}>
+    <span role="img" aria-label="check">✅</span> Completed:{' '}
+    <strong>{caseSummaryStats.completed}</strong>
+  </div>
 
-    const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+  {/* --- Assignment counts --- */}
+  <div style={{ marginBottom: '8px' }}>
+    <span role="img" aria-label="rocket">🚀</span> Assigned:{' '}
+    <strong>{caseSummaryStats.assigned}</strong>
+  </div>
+  <div style={{ marginBottom: '12px' }}>
+    <span role="img" aria-label="question">❔</span> Unassigned:{' '}
+    <strong>{caseSummaryStats.unassigned}</strong>
+  </div>
 
-    return (
-      <>
-        <div style={{ marginBottom: '8px' }}>
-  <span role="img" aria-label="folder">📁</span> Total Cases: <strong>{total}</strong>
-</div>
-<div style={{ marginBottom: '8px' }}>
-  <span role="img" aria-label="rocket">🚀</span> Assigned: <strong>{assigned}</strong>
-</div>
-<div style={{ marginBottom: '8px' }}>
-  <span role="img" aria-label="question">❔</span> Unassigned: <strong>{unassigned}</strong>
-</div>
-<div style={{ marginBottom: '8px' }}>
-  <span role="img" aria-label="pending">🟡</span> Pended: <strong>{pended}</strong>
-</div>
-<div style={{ marginBottom: '12px' }}>
-  <span role="img" aria-label="check">✅</span> Completed: <strong>{completed}</strong>
+  {/* --- Completion-rate bar --- */}
+  <div
+    style={{
+      fontSize: '12px',
+      marginBottom: '4px',
+      color: '#003b70',
+      fontWeight: '500'
+    }}
+  >
+    Completion Rate
+  </div>
+  <div
+    style={{
+      backgroundColor: '#e0e0e0',
+      borderRadius: '20px',
+      height: '10px',
+      overflow: 'hidden'
+    }}
+  >
+    <div
+      style={{
+        height: '100%',
+        width: `${caseSummaryStats.completionRate}%`,
+        backgroundColor: '#28a745',
+        transition: 'width 0.3s ease-in-out'
+      }}
+    />
+  </div>
+  <div
+    style={{
+      fontSize: '12px',
+      marginTop: '4px',
+      textAlign: 'right'
+    }}
+  >
+    {caseSummaryStats.completionRate}%
+  </div>
 </div>
 
-
-        <div style={{ fontSize: '12px', marginBottom: '4px', color: '#003b70', fontWeight: '500' }}>
-          Completion Rate
-        </div>
-        <div style={{ backgroundColor: '#e0e0e0', borderRadius: '20px', height: '10px', overflow: 'hidden' }}>
-          <div
-            style={{
-              height: '100%',
-              width: `${percent}%`,
-              backgroundColor: '#28a745',
-              transition: 'width 0.3s ease-in-out',
-            }}
-          />
-        </div>
-        <div style={{ fontSize: '12px', marginTop: '4px', textAlign: 'right' }}>{percent}%</div>
-      </>
-    );
-  })()}
-</div>
 
 
 
@@ -667,6 +726,8 @@ const unassigned = total - completed - pended - assigned;
 
 
 
+
+
 {/* Pre-Service Section */}
 {preserviceRows.length > 0 && (
   <div style={{
@@ -688,65 +749,36 @@ const unassigned = total - completed - pended - assigned;
     </h3>
 
 
-<div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-  <div>
-    <label style={{ fontWeight: '500', color: '#003b70', display: 'block', marginBottom: '4px' }}>
-      Filter By Column:
-    </label>
-    <select
-      value={filterColumn}
-      onChange={(e) => {
-        setFilterColumn(e.target.value);
-        setFilterValue('');
-      }}
-      style={{
-        padding: '8px',
-        borderRadius: '6px',
-        border: '1px solid #ccc',
-        width: '180px',
-        fontFamily: 'inherit'
-      }}
-    >
-      <option value="">-- Select Column --</option>
-{Object.values(preserviceColumnMap)
-  .filter(header => {
-    const trimmed = header.trim().toLowerCase();
-    return trimmed !== 'manager' && !trimmed.startsWith('__empty') && trimmed !== '';
-  })
-  .map((label) => (
-    <option key={label} value={label}>{label}</option>
-))}
-    </select>
-  </div>
-
-  <div>
-    <label style={{ fontWeight: '500', color: '#003b70', display: 'block', marginBottom: '4px' }}>
-      Where Value is:
-    </label>
-    <select
-      value={filterValue}
-      onChange={(e) => setFilterValue(e.target.value)}
-      style={{
-        padding: '8px',
-        borderRadius: '6px',
-        border: '1px solid #ccc',
-        width: '180px',
-        fontFamily: 'inherit'
-      }}
-      disabled={!filterColumn}
-    >
-      <option value="">-- Select Value --</option>
-      {(() => {
-  const actualKey = resolveExcelHeader(filterColumn);
-  return [...new Set(preserviceRows.map(row => row[actualKey]).filter(Boolean))]
-    .sort()
-    .map((val, idx) => (
-      <option key={idx} value={val}>{val}</option>
-    ));
-})()}
-    </select>
-  </div>
+{/* === Case Status Filter (Open / Pended / Completed) === */}
+<div style={{ marginBottom: '16px', width: '200px' }}>
+  <label
+    style={{
+      fontWeight: '500',
+      color: '#003b70',
+      display: 'block',
+      marginBottom: '4px'
+    }}
+  >
+    Filter by Case Status:
+  </label>
+  <select
+    value={caseStatusFilter}
+    onChange={(e) => setCaseStatusFilter(e.target.value)}
+    style={{
+      padding: '8px',
+      borderRadius: '6px',
+      border: '1px solid #ccc',
+      width: '100%',
+      fontFamily: 'inherit'
+    }}
+  >
+    <option value="All">All</option>
+    <option value="Open">Open</option>
+    <option value="Pended">Pended</option>
+    <option value="Completed">Completed</option>
+  </select>
 </div>
+
 
 
 <div style={{
@@ -772,21 +804,33 @@ const unassigned = total - completed - pended - assigned;
 
   <div style={{ display: 'flex', gap: '12px' }}>
 
-    <button
+<button
   onClick={() => setShowAssignModal(true)}
-  disabled={selectedRows.length === 0}
+  disabled={
+    selectedRows.filter((r) => getOwnerHelperValue(r) !== 'ASSIGNED').length ===
+    0
+  }
   style={{
-    backgroundColor: selectedRows.length > 0 ? '#0071ce' : '#aaa',
+    backgroundColor:
+      selectedRows.filter((r) => getOwnerHelperValue(r) !== 'ASSIGNED')
+        .length > 0
+        ? '#0071ce'
+        : '#aaa',
     color: 'white',
     border: 'none',
     padding: '8px 16px',
     borderRadius: '6px',
-    cursor: selectedRows.length > 0 ? 'pointer' : 'not-allowed',
+    cursor:
+      selectedRows.filter((r) => getOwnerHelperValue(r) !== 'ASSIGNED')
+        .length > 0
+        ? 'pointer'
+        : 'not-allowed',
     fontWeight: '600'
   }}
 >
   Assign
 </button>
+
 
     <button
       onClick={() => setShowFollowUpModal(true)}
@@ -840,36 +884,6 @@ const unassigned = total - completed - pended - assigned;
 
 
 
-<div style={{ marginBottom: '16px', width: '200px' }}>
-  <label
-    style={{
-      fontWeight: '500',
-      color: '#003b70',
-      display: 'block',
-      marginBottom: '4px'
-    }}
-  >
-    Filter by Status:
-  </label>
-  <select
-    value={statusFilter}
-    onChange={(e) => setStatusFilter(e.target.value)}
-    style={{
-      padding: '8px',
-      borderRadius: '6px',
-      border: '1px solid #ccc',
-      width: '100%',
-      fontFamily: 'inherit'
-    }}
-  >
-    <option value="All">All</option>
-<option value="ASSIGNED">Assigned</option>
-<option value="UNASSIGNED">Unassigned</option>
-<option value="PENDED">Pended</option>
-<option value="COMPLETED">Completed</option>
-
-  </select>
-</div>
 
 
 
@@ -891,10 +905,10 @@ const unassigned = total - completed - pended - assigned;
   <tr>
     <th style={{ padding: '8px', border: '1px solid #ccc' }}>
       <input
-        type="checkbox"
-        checked={isAllSelected}
-        onChange={toggleSelectAll}
-      />
+  type="checkbox"
+  checked={isAllSelected}
+  onChange={toggleSelectAll}
+/>
     </th>
     {Object.values(preserviceColumnMap).map((header) => (
       <th key={header} style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
@@ -902,20 +916,17 @@ const unassigned = total - completed - pended - assigned;
       </th>
     ))}
 <th
-  onClick={markPaginatedRowsAsPending}
   style={{
     padding: '8px',
     border: '1px solid #ccc',
     fontWeight: '600',
     textAlign: 'left',
-    cursor: 'pointer',
-    color: '#0071ce',
-    textDecoration: 'underline'
+    backgroundColor: '#e0eafc',
   }}
-  title="Click to set status as PENDING for visible rows only"
 >
-  Status
+  Case Assignment
 </th>
+
 
 <th style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
   Actions
@@ -929,19 +940,43 @@ const unassigned = total - completed - pended - assigned;
     return (
       <tr key={idx}>
         <td style={{ padding: '8px', border: '1px solid #eee' }}>
-          <input
-            type="checkbox"
-            checked={isChecked}
-            onChange={() => toggleRowSelection(row)}
-          />
-        </td>
+  <input
+    type="checkbox"
+    checked={isChecked}
+    onChange={() => toggleRowSelection(row)}
+  />
+</td>
+
 {Object.keys(preserviceColumnMap).map((excelKey) => (
   <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
-    {preserviceDateFields.includes(excelKey)
-      ? formatExcelDate(row[excelKey])
-      : (row[excelKey] ?? '')}
+    {/* Special handling for Case Status */}
+    {excelKey === 'Status' && String(row['Status']).trim() === 'Pended' ? (
+      <button
+        style={{
+          background: 'none',
+          border: 'none',
+          color: '#0071ce',
+          textDecoration: 'underline',
+          cursor: 'pointer',
+          padding: 0,
+          fontSize: 'inherit',
+          fontFamily: 'inherit'
+        }}
+        onClick={() => {
+          setPendReasonText(row['Pend_Reason'] || 'No reason provided.');
+          setShowPendReasonModal(true);
+        }}
+      >
+        Pended
+      </button>
+    ) : preserviceDateFields.includes(excelKey) ? (
+      formatExcelDate(row[excelKey])
+    ) : (
+      row[excelKey] ?? ''
+    )}
   </td>
 ))}
+
 
 {/* ✅ Status Column */}
 <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '500' }}>
@@ -1070,58 +1105,34 @@ const unassigned = total - completed - pended - assigned;
     >
       <h3 style={{ marginBottom: '16px', color: '#003b70' }}>Row Details</h3>
 
-      {/* ✅ Show 'Reason for Pending' button only if status is PENDING */}
-{(() => {
-  const raw = (selectedRow['OWNER_HELPER'] || '').trim().toUpperCase();
-  const owner = (selectedRow['Owner'] || '').toUpperCase();
-  const status = raw || (owner.includes('SHARANAPPA') || owner.includes('VEERESHA') ? 'PENDED' : 'OPEN');
 
-  return status === 'PENDED' ? (
-    <button
-      style={{
-        position: 'absolute',
-        top: '20px',
-        right: '20px',
-        backgroundColor: '#ff9800',
-        color: 'white',
-        border: 'none',
-        padding: '6px 12px',
-        borderRadius: '6px',
-        fontSize: '13px',
-        fontWeight: '600',
-        cursor: 'pointer'
-      }}
-      onClick={() => setShowReasonModal(true)}
-    >
-      Reason for Pended
-    </button>
-  ) : null;
-})()}
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
         <tbody>
-          {Object.entries(selectedRow).map(([key, value]) => {
-            const displayValue = preserviceDateFields.includes(key)
-              ? formatExcelDate(value)
-              : value;
+          {Object.entries(selectedRow)
+  .filter(([key]) => key !== 'Pend_Reason') // ✅ Hides this key only
+  .map(([key, value]) => {
+    const displayValue = preserviceDateFields.includes(key)
+      ? formatExcelDate(value)
+      : value;
 
-            if (
-              displayValue === null ||
-              displayValue === undefined ||
-              (typeof displayValue === 'string' && displayValue.trim() === '')
-            ) return null;
+    if (
+      displayValue === null ||
+      displayValue === undefined ||
+      (typeof displayValue === 'string' && displayValue.trim() === '')
+    ) return null;
 
-            return (
-              <tr key={key}>
-                <td style={{ fontWeight: '600', padding: '6px', borderBottom: '1px solid #eee', width: '40%' }}>
-                  {key}
-                </td>
-                <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>
-                  {displayValue}
-                </td>
-              </tr>
-            );
-          })}
+    return (
+      <tr key={key}>
+        <td style={{ fontWeight: '600', padding: '6px', borderBottom: '1px solid #eee', width: '40%' }}>
+          {key}
+        </td>
+        <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>
+          {displayValue}
+        </td>
+      </tr>
+    );
+  })}
         </tbody>
       </table>
 
@@ -1230,10 +1241,10 @@ const unassigned = total - completed - pended - assigned;
 )}
 
 
-{showReasonModal && (
+{showPendReasonModal && (
   <div
-    onClick={() => setShowReasonModal(false)}
-    onKeyDown={(e) => e.key === 'Escape' && setShowReasonModal(false)}
+    onClick={() => setShowPendReasonModal(false)}
+    onKeyDown={(e) => e.key === 'Escape' && setShowPendReasonModal(false)}
     tabIndex={0}
     style={{
       position: 'fixed',
@@ -1251,18 +1262,38 @@ const unassigned = total - completed - pended - assigned;
         backgroundColor: 'white',
         borderRadius: '10px',
         padding: '24px',
-        maxWidth: '400px',
+        maxWidth: '450px',
         width: '90%',
         boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
         textAlign: 'center',
       }}
     >
-      <h3 style={{ marginBottom: '16px', color: '#003b70' }}>Reason for Pended</h3>
-      <p style={{ fontSize: '14px', marginBottom: '24px' }}>
-        Missing provider documentation.
-      </p>
+      <h3 style={{ marginBottom: '16px', color: '#003b70' }}>
+        Reason for Pended
+      </h3>
+<div
+  style={{
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginBottom: '24px'
+  }}
+>
+  <span style={{ fontSize: '14px', fontWeight: '500' }}>{pendReasonText}</span>
+  <span style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+    {new Date().toLocaleString('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })}
+  </span>
+</div>
+
       <button
-        onClick={() => setShowReasonModal(false)}
+        onClick={() => setShowPendReasonModal(false)}
         style={{
           backgroundColor: '#003b70',
           color: 'white',
@@ -1280,6 +1311,7 @@ const unassigned = total - completed - pended - assigned;
 )}
 
 
+
 {showAssignModal && (
   <div
     onClick={() => setShowAssignModal(false)}
@@ -1287,80 +1319,177 @@ const unassigned = total - completed - pended - assigned;
     tabIndex={0}
     style={{
       position: 'fixed',
-      top: 0, left: 0, right: 0, bottom: 0,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.4)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1100,
+      zIndex: 1100
     }}
   >
     <div
       onClick={(e) => e.stopPropagation()}
       style={{
         backgroundColor: 'white',
-        borderRadius: '10px',
+        borderRadius: '12px',
         padding: '24px',
-        maxWidth: '400px',
         width: '90%',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-        textAlign: 'center',
+        maxWidth: '420px',
+        boxShadow: '0 8px 16px rgba(0,0,0,0.25)',
+        maxHeight: '90vh',
+        overflowY: 'auto'
       }}
     >
-      <h3 style={{ marginBottom: '16px', color: '#003b70' }}>Assign Selected Cases</h3>
+      <h3 style={{ marginBottom: '16px', color: '#003b70' }}>
+        Assign {selectedRows.length} {selectedRows.length === 1 ? 'Case' : 'Cases'}
+      </h3>
 
-      <select
-        value={assignTo}
-        onChange={(e) => setAssignTo(e.target.value)}
-        style={{
-          width: '100%',
-          padding: '10px',
-          borderRadius: '6px',
-          border: '1px solid #ccc',
-          fontSize: '14px',
-          marginBottom: '20px'
-        }}
-      >
-        <option value="">-- Select OwnerName --</option>
-        {[...new Set(preserviceRows.map(row => row['OwnerName']).filter(Boolean))]
-          .sort()
-          .map((name, i) => (
-            <option key={i} value={name}>{name}</option>
-          ))}
-      </select>
+      {/* --- Agent Dropdown and Add Button --- */}
+      <label style={{ fontWeight: '500', marginBottom: '6px', display: 'block' }}>
+        Select Agent:
+      </label>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+       <select
+  value=""
+  disabled={assignTo.length >= selectedRows.length}  // 🚫 lock when limit reached
+  onChange={(e) => {
+    const newAgent = e.target.value;
+    if (!newAgent) return;
 
+    // 🔒 Max-agent rule
+    if (assignTo.length >= selectedRows.length) {
+      alert(`You can assign at most ${selectedRows.length} agent${selectedRows.length === 1 ? '' : 's'} for ${selectedRows.length} case${selectedRows.length === 1 ? '' : 's'}.`);
+      return;
+    }
+
+    if (!assignTo.includes(newAgent)) {
+      setAssignTo([...assignTo, newAgent]);
+    }
+  }}
+  style={{
+    flex: 1,
+    padding: '8px',
+    borderRadius: '6px',
+    border: '1px solid #ccc',
+    fontFamily: 'inherit',
+    backgroundColor: assignTo.length >= selectedRows.length ? '#eee' : 'white'
+  }}
+>
+  <option value="">-- Select Agent --</option>
+  {[...new Set(
+    preserviceRows
+      .map((r) => r['OwnerName'])
+      .filter((name) => {
+        if (!name) return false;
+        const lower = name.toLowerCase();
+        return (
+          !lower.includes('proclaim_queu') &&
+          !lower.includes('queue') &&
+          !lower.startsWith('sagproc')
+        );
+      })
+  )]
+    .sort()
+    .map((name) => (
+      <option key={name} value={name}>
+        {name}
+      </option>
+    ))}
+</select>
+
+      </div>
+
+      {/* --- Selected Agent List --- */}
+      {assignTo.length > 0 && (
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '10px',
+            backgroundColor: '#f9f9f9',
+            borderRadius: '6px',
+            border: '1px solid #ddd'
+          }}
+        >
+          <strong style={{ display: 'block', marginBottom: '6px' }}>
+            Selected Agent(s):
+          </strong>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {assignTo.map((name) => (
+              <li
+                key={name}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '4px'
+                }}
+              >
+                <span>{name}</span>
+                <button
+                  onClick={() =>
+                    setAssignTo(assignTo.filter((agent) => agent !== name))
+                  }
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#c00',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  ❌
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* --- Confirm / Cancel buttons --- */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
         <button
+          disabled={assignTo.length === 0}
           onClick={() => {
-            const selectedOwner = preserviceRows.find(r => r['OwnerName'] === assignTo);
-            if (!selectedOwner) return;
+            if (assignTo.length === 0) return;
 
-            const updated = preserviceRows.map(row => {
-              if (selectedRows.some(sel => sel['SR'] === row['SR'])) {
-                return {
-                  ...row,
-                  OwnerName: selectedOwner['OwnerName'],
-                  OwnerID: selectedOwner['OwnerID'],
-                  OWNER_HELPER: 'ASSIGNED'
-                };
-              }
-              return row;
+            // map agent to OwnerID
+            const idMap = {};
+            preserviceRows.forEach((r) => {
+              if (r['OwnerName']) idMap[r['OwnerName']] = r['OwnerID'];
+            });
+
+            const updated = preserviceRows.map((row) => {
+              const match = selectedRows.some((sel) => sel['SR'] === row['SR']);
+              if (!match) return row;
+
+              const i = selectedRows.findIndex((sel) => sel['SR'] === row['SR']);
+              const agent = assignTo[i % assignTo.length];
+
+              return {
+                ...row,
+                OwnerName: agent,
+                OwnerID: idMap[agent] || '',
+                OWNER_HELPER: 'ASSIGNED'
+              };
             });
 
             setPreserviceRows(updated);
             setSelectedRows([]);
-            setAssignTo('');
+            setAssignTo([]);
             setShowAssignModal(false);
           }}
-          disabled={!assignTo}
           style={{
-            backgroundColor: '#0071ce',
+            backgroundColor: assignTo.length ? '#0071ce' : '#aaa',
             color: 'white',
             border: 'none',
             padding: '8px 16px',
             borderRadius: '6px',
             fontWeight: '600',
-            cursor: assignTo ? 'pointer' : 'not-allowed'
+            cursor: assignTo.length ? 'pointer' : 'not-allowed'
           }}
         >
           Confirm
@@ -1383,6 +1512,8 @@ const unassigned = total - completed - pended - assigned;
     </div>
   </div>
 )}
+
+
 
 
 
