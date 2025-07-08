@@ -139,7 +139,7 @@ function POCPage() {
   };
 
   const subBarLabels = [
-    "Filter Work Appeals",
+    "Prioritizing Appeals for assignment",
     "Check Appeal Status",
     "Sending appeals through email",
     "Checking Backlogs",
