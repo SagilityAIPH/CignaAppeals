@@ -944,29 +944,33 @@ const ownedRows = preserviceRows.filter(
           }}
         >
           <option value="">-- Select Reason --</option>
-          <option value="AOR verification">AOR verification</option>
-          <option value="Auth Load">Auth Load</option>
-          <option value="CASA Diary-Clinical review">CASA Diary-Clinical review</option>
-          <option value="Coder review">Coder review</option>
-          <option value="Committee">Committee</option>
-          <option value="Correspondence">Correspondence</option>
-          <option value="Customer VS Provider">Customer VS Provider</option>
-          <option value="DPL Intake">DPL Intake</option>
-          <option value="EMR ( Escalated mail review )">EMR ( Escalated mail review )</option>
-          <option value="Evicore">Evicore</option>
-          <option value="Expedited Appeals">Expedited Appeals</option>
-          <option value="File Request">File Request</option>
-          <option value="HD Review- Non IFP">HD Review- Non IFP</option>
-          <option value="Mail sent to Vendor Pricing">Mail sent to Vendor Pricing</option>
-          <option value="Mails to Prepay">Mails to Prepay</option>
-          <option value="Mails to TPV">Mails to TPV</option>
-          <option value="Misroutes">Misroutes</option>
-          <option value="Pathwell">Pathwell</option>
-          <option value="Oral notification">Oral notification</option>
-          <option value="Pharmacy, Behavioral, Transplant & Dialysis">Pharmacy, Behavioral, Transplant & Dialysis</option>
-          <option value="RRG ( Revenue recovery group )">RRG ( Revenue recovery group )</option>
-          <option value="Sent for Adjustment">Sent for Adjustment</option>
-          <option value="SIU Review">SIU Review</option>
+<option value="Routed to CASA Diary-Clinical review">Routed to CASA Diary-Clinical review</option>
+<option value="Routed to HD Review- Non IFP">Routed to HD Review- Non IFP</option>
+<option value="Sent for Adjustment">Sent for Adjustment</option>
+<option value="Routed to Coder review">Routed to Coder review</option>
+<option value="Mail sent to TPV ( Pricing Review)">Mail sent to TPV ( Pricing Review)</option>
+<option value="Mail sent to Prepay">Mail sent to Prepay</option>
+<option value="Mail sent to SIU Review">Mail sent to SIU Review</option>
+<option value="Routed to Correspondence">Routed to Correspondence</option>
+<option value="Mail sent to Vendor Pricing">Mail sent to Vendor Pricing</option>
+<option value="Routed to Auth Load">Routed to Auth Load</option>
+<option value="Routed to Committee">Routed to Committee</option>
+<option value="Routed to Pharmacy">Routed to Pharmacy</option>
+<option value="Routed to Behavioral">Routed to Behavioral</option>
+<option value="Routed to Transplant">Routed to Transplant</option>
+<option value="Routed to Dialysis">Routed to Dialysis</option>
+<option value="Mail sent to Evicore">Mail sent to Evicore</option>
+<option value="Mail sent to Pathwell">Mail sent to Pathwell</option>
+<option value="Mail sent to RRG ( Revenue recovery group )">Mail sent to RRG ( Revenue recovery group )</option>
+<option value="Mail sent to Oral notification">Mail sent to Oral notification</option>
+<option value="Mail sent to Expedited Appeals">Mail sent to Expedited Appeals</option>
+<option value="Routed to File Request">Routed to File Request</option>
+<option value="Mail sent to EMR ( Escalated mail review )">Mail sent to EMR ( Escalated mail review )</option>
+<option value="Routed to Customer VS Provider">Routed to Customer VS Provider</option>
+<option value="DPL Intake">DPL Intake</option>
+<option value="Mail sent for AOR verification">Mail sent for AOR verification</option>
+<option value="Misroutes">Misroutes</option>
+
           
         </select>
       <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
