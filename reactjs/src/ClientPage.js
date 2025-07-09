@@ -14,10 +14,15 @@ const handleNavClick = (path, itemKey) => {
   // Step 1: Set auto-load flag if going to /client/proclaim
   if (path === "/client/proclaim") {
     localStorage.setItem("autoLoadProclaim", "true");
+
+  } else if (path === "/client/facets") {
+  localStorage.setItem("autoLoadFacets", "true");   // new flag for Facets
   }
 
   navigate(path);
 };
+
+
 
   return (
     <>
@@ -147,6 +152,29 @@ const handleNavClick = (path, itemKey) => {
         Proclaim
       </button>
     </li>
+
+        <li className="nav-item px-3 mb-2">
+      <button
+        onClick={() => handleNavClick("/client/impact", "impact")}
+        style={{
+          backgroundColor: selectedItem === "impact" ? "#005b9f" : "transparent",
+          border: "none",
+          display: "flex",
+          alignItems: "center",
+          color: "white",
+          cursor: "pointer",
+          padding: "10px 15px",
+          borderRadius: "4px",
+          width: '92%',
+          marginLeft: '8px',
+          marginBottom: '8px'
+        }}
+      >
+        <MdDashboard style={{ marginRight: "15px" }} />
+        Impact
+      </button>
+    </li>
+
   </ul>
 
   {/* Logout Button at Bottom */}

@@ -138,21 +138,22 @@ function POCPage() {
     }, 400);
   };
 
-  const subBarLabels = [
-    "Prioritizing Appeals for assignment",
-    "Check Appeal Status",
-    "Sending appeals through email",
-    "Checking Backlogs",
-    "Updating Dashboard",
-    "Cross-checking Appeals Status",
-  ];
-  const segment = 100 / subBarLabels.length;
+// Remove the 6th label from here
+const subBarLabels = [
+  "Prioritizing Appeals for assignment",
+  "Check Appeal Status",
+  "Sending appeals through email",
+  "Checking Backlogs",
+  "Updating Dashboard",
+];
 
-  const getSubBarWidth = (i) => {
-    const start = i * segment;
-    const filled = Math.min(Math.max(uploadProgress - start, 0), segment);
-    return (filled / segment) * 100;
-  };
+const segment = 100 / subBarLabels.length;
+
+const getSubBarWidth = (i) => {
+  const start = i * segment;
+  const filled = Math.min(Math.max(uploadProgress - start, 0), segment);
+  return (filled / segment) * 100;
+};
 
   return (
     <>

@@ -36,6 +36,7 @@ const managerName =
     const [gnbSummary, setGnbSummary] = useState([]);
     const [selectedRows, setSelectedRows] = useState([]);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+const [showFollowToast, setShowFollowToast] = useState(false);
 
 // 👉 Pended-reason modal
 const [showPendReasonModal, setShowPendReasonModal] = useState(false);
@@ -267,7 +268,9 @@ const paginatedRows = filteredPreserviceRows.slice(
 );
 
 // --- Are ALL selectable rows on this page already checked? ---
-const selectableRows = paginatedRows.filter((r) => !isRowAssigned(r));
+const selectableRows = paginatedRows.filter(
+  (row) => getOwnerHelperValue(row) !== 'COMPLETED'
+);
 
 const isAllSelected =
   selectableRows.length > 0 &&
@@ -312,22 +315,26 @@ const caseSummaryStats = useMemo(() => {
 // --- Header checkbox toggle ---
 const toggleSelectAll = () => {
   if (isAllSelected) {
-    // remove only selectable rows
+    // Remove all selectable rows on current page
     setSelectedRows((prev) =>
-      prev.filter((sel) => isRowAssigned(sel))
+      prev.filter(
+        (sel) =>
+          !selectableRows.some((row) => row['SR'] === sel['SR'])
+      )
     );
   } else {
-    // add all selectable rows
-    setSelectedRows((prev) => [
-      ...prev.filter((sel) => isRowAssigned(sel)),
-      ...selectableRows,
-    ]);
+    // Add missing selectable rows on current page
+    const newRows = selectableRows.filter(
+      (row) => !selectedRows.some((sel) => sel['SR'] === row['SR'])
+    );
+    setSelectedRows((prev) => [...prev, ...newRows]);
   }
 };
 
 // --- Row checkbox toggle ---
 const toggleRowSelection = (row) => {
-  if (isRowAssigned(row)) return; // ignore clicks on ASSIGNED rows
+  const status = getOwnerHelperValue(row);
+  if (status === 'COMPLETED') return; // ✅ Prevent selecting completed rows
 
   setSelectedRows((prev) => {
     const exists = prev.some((sel) => sel['SR'] === row['SR']);
@@ -336,6 +343,7 @@ const toggleRowSelection = (row) => {
       : [...prev, row];
   });
 };
+
 
 
 
@@ -940,11 +948,12 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
     return (
       <tr key={idx}>
         <td style={{ padding: '8px', border: '1px solid #eee' }}>
-  <input
-    type="checkbox"
-    checked={isChecked}
-    onChange={() => toggleRowSelection(row)}
-  />
+<input
+  type="checkbox"
+  checked={isChecked}
+  onChange={() => toggleRowSelection(row)}
+/>
+
 </td>
 
 {Object.keys(preserviceColumnMap).map((excelKey) => (
@@ -1194,21 +1203,26 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
         Are you sure you want to send the selected case(s) for follow-up?
       </p>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
-        <button
-          onClick={() => {
-            const updated = preserviceRows.map(row => {
-              const match = selectedRows.some(sel => sel['SR'] === row['SR']);
-              if (match) {
-                return { ...row, OWNER_HELPER: 'PENDED' };
-              }
-              return row;
-            });
+<button
+  onClick={() => {
+    const updated = preserviceRows.map(row => {
+      const match = selectedRows.some(sel => sel['SR'] === row['SR']);
+      if (match) {
+        return { ...row, OWNER_HELPER: 'PENDED' };
+      }
+      return row;
+    });
 
-            setPreserviceRows(updated);
-            setSelectedRows([]);
-            setShowFollowUpModal(false);
-            setCurrentPage(1);
-          }}
+    setPreserviceRows(updated);
+    setSelectedRows([]);
+    setShowFollowUpModal(false);
+    setCurrentPage(1);
+
+    // 🔔 SHOW TOAST
+    setShowFollowToast(true);
+    setTimeout(() => setShowFollowToast(false), 3000); // 3 s then disappear
+  }}
+
           style={{
             backgroundColor: '#ff9800',
             color: 'white',
@@ -1310,6 +1324,28 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
   </div>
 )}
 
+
+
+{/* --- Notif for Follow Up --- */}
+{showFollowToast && (
+<div
+  style={{
+    position: 'fixed',
+    top: '70px',
+    right: '20px',
+    backgroundColor: '#28a745',
+    color: 'white',
+    padding: '12px 20px',
+    borderRadius: '8px',
+    boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+    zIndex: 1200,
+    fontWeight: 600,
+    animation: 'slideInRight 0.4s ease-out'
+  }}
+>
+  Email follow-up has been sent for confirmation
+</div>
+)}
 
 
 {showAssignModal && (

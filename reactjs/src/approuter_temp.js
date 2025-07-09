@@ -10,7 +10,7 @@ import TeamLeadCasesPage from './TeamLeadCasesPage';
 import AgentPage from './AgentPage';
 import AgentCasesPage from './AgentCasesPage';
 import POCPage from './POCPage';
-
+import ImpactPage from './ClientImpactPage';
 
 // Future: import ManagerPage, AdminPage, etc.
 
@@ -25,6 +25,7 @@ function AppRouter() {
           <Route path="executive-summary" element={<ExecutiveSummary />} />
           <Route path="facets" element={<FacetsPage />} />
           <Route path="proclaim" element={<ProclaimPage />} />
+          <Route path="impact" element={<ImpactPage />} />
         </Route>
         <Route path="/teamlead" element={<TeamLeadPage />}>
            <Route path="teamlead-cases" element={<TeamLeadCasesPage />} />

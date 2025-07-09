@@ -44,6 +44,7 @@ const [pendedReasonSummary, setPendedReasonSummary] = useState([]);
 const [selectedPendedGsp, setSelectedPendedGsp] = useState('All');
 
 const [pendedSort, setPendedSort] = useState({ key: 'Total', direction: 'desc' });
+const [memberProviderSummary, setMemberProviderSummary] = useState([]);
 
 const handlePendedSort = (key) => {
   setPendedSort((prev) => ({
@@ -150,57 +151,105 @@ json.forEach(row => {
 // ---- collect pended reasons  (row-based %) ---------------------------------------
 {
   const reasonsList = [
-    'CASA Diary-Clinical review', 'HD Review- Non IFP', 'Sent for Adjustment',
-    'Coder review', 'Mails to TPV', 'Mails to Prepay', 'SIU Review',
-    'Correspondence', 'Mail sent to Vendor Pricing', 'Auth Load', 'Committee',
-    'Pharmacy, Behavioral, Transplant & Dialysis', 'Evicore',
-    'RRG ( Revenue recovery group )', 'Oral notification', 'Expedited Appeals',
-    'File Request', 'EMR ( Escalated mail review )', 'Customer VS Provider',
-    'DPL Intake', 'AOR verification', 'Misroutes'
-  ];
-  const directors = ['Sagility', 'Concentrix', 'Wipro'];
+  'Routed to CASA Diary-Clinical review',
+  'Routed to HD Review- Non IFP',
+  'Sent for Adjustment',
+  'Routed to Coder review',
+  'Mail sent to TPV ( Pricing Review)',
+  'Mail sent to Prepay',
+  'Mail sent to SIU Review',
+  'Routed to Correspondence',
+  'Mail sent to Vendor Pricing',
+  'Routed to Auth Load',
+  'Routed to Committee',
+  'Routed to Pharmacy',
+  'Routed to Behavioral',
+  'Routed to Transplant',
+  'Routed to Dialysis',
+  'Mail sent to Evicore',
+  'Mail sent to Pathwell',
+  'Mail sent to RRG ( Revenue recovery group )',
+  'Mail sent to Oral notification',
+  'Mail sent to Expedited Appeals',
+  'Routed to File Request',
+  'Mail sent to EMR ( Escalated mail review )',
+  'Routed to Customer VS Provider',
+  'DPL Intake',
+  'Mail sent for AOR verification',
+  'Misroutes'
+];
 
-  // ⮕ raw counts per reason / director
-  const reasonTally = reasonsList.reduce(
-    (acc, r) => ({ ...acc, [r]: { Sagility: 0, Concentrix: 0, Wipro: 0 } }),
-    {}
+const directors = ['Sagility', 'Concentrix', 'Wipro'];
+
+const stripPrefix = txt =>
+  txt.replace(/^(routed to |mail sent to |mail sent for )/i, '').trim();
+
+/* period-level grouping */
+const groups = {};
+
+excelData.forEach((row, idx) => {
+  if ((row['Claim System'] || '').trim().toLowerCase() !== 'proclaim') return;
+  if (!(row['Department']   || '').toLowerCase().includes('appeal'))   return;
+  if ((row['Status']        || '').trim().toLowerCase() !== 'pended')  return;
+
+  const director = (row['Director'] || '').trim();
+  if (!directors.includes(director)) return;
+
+  /* date → period key */
+  let jsDate = null;
+  const rawDate = row['ReportDate'];
+  if (rawDate instanceof Date)            jsDate = rawDate;
+  else if (typeof rawDate === 'number')   jsDate = new Date((rawDate - 25569) * 86400 * 1000);
+  else if (typeof rawDate === 'string') { const p = new Date(rawDate); if (!isNaN(p)) jsDate = p; }
+  if (!jsDate) return;
+
+  const getPeriodKey = (d, view) => {
+    if (view === 'Daily')  return d.toISOString().split('T')[0];
+    if (view === 'Weekly'){ const s=new Date(d); s.setDate(d.getDate()-d.getDay()); return s.toISOString().split('T')[0]; }
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;  // Monthly
+  };
+
+  const key = getPeriodKey(jsDate, trendView);
+
+  const rawReason = (row['Pend Reason'] || row['Pended Reason'] || '').trim();
+  const cleaned   = stripPrefix(rawReason.toLowerCase());
+
+  let reason = reasonsList.find(r =>
+    stripPrefix(r.toLowerCase()).includes(cleaned) ||
+    cleaned.includes(stripPrefix(r.toLowerCase()))
   );
+  if (!reason) reason = reasonsList[idx % reasonsList.length];
 
-  json.forEach((row, idx) => {
-    if ((row['Claim System'] || '').trim().toLowerCase() !== 'proclaim') return;
-    if (!(row['Department']   || '').toLowerCase().includes('appeal'))   return;
-    if ((row['Status']        || '').trim().toLowerCase() !== 'pended')  return;
+  if (!groups[key])         groups[key] = {};
+  if (!groups[key][reason]) groups[key][reason] = { Sagility:0, Concentrix:0, Wipro:0 };
 
-    const dir = (row['Director'] || '').trim();
-    if (!directors.includes(dir)) return;
+  groups[key][reason][director] += 1;
+});
 
-    const rawReason = (row['Pend Reason'] || row['Pended Reason'] || '')
-                      .trim().toLowerCase();
-    let   reason = reasonsList.find(r => rawReason.includes(r.toLowerCase()));
-    if (!reason) reason = reasonsList[idx % reasonsList.length];         // fallback
+/* latest-period summary (keeps zero rows) */
+const latestKey = trendView === 'Monthly'
+  ? Object.keys(groups).sort().pop()
+  : Object.keys(groups).sort((a,b)=>new Date(a)-new Date(b)).pop();
 
-    reasonTally[reason][dir] += 1;
-  });
+const pct = (n, d) => d ? ((n / d) * 100).toFixed(1) : '0.0';
 
-  // ⮕ convert to summary with % per reason row
-  const pct = (n, d) => d ? ((n / d) * 100).toFixed(1) : '0.0';
+const summary = reasonsList.map(r => {
+  const g = (groups[latestKey] && groups[latestKey][r]) ||
+            { Sagility:0, Concentrix:0, Wipro:0 };
+  const total = g.Sagility + g.Concentrix + g.Wipro;
+  return {
+    Reason:        r,
+    Sagility:      g.Sagility,
+    SagilityPct:   pct(g.Sagility, total),
+    Concentrix:    g.Concentrix,
+    ConcentrixPct: pct(g.Concentrix, total),
+    Wipro:         g.Wipro,
+    WiproPct:      pct(g.Wipro, total),
+    Total:         total
+  };
+});
 
-  const pendedSummary = reasonsList.map(r => {
-    const g = reasonTally[r];
-    const total = g.Sagility + g.Concentrix + g.Wipro;
-    return {
-      Reason:        r,
-      Sagility:      g.Sagility,
-      SagilityPct:   pct(g.Sagility, total),
-      Concentrix:    g.Concentrix,
-      ConcentrixPct: pct(g.Concentrix, total),
-      Wipro:         g.Wipro,
-      WiproPct:      pct(g.Wipro, total),
-      Total:         total
-    };
-  });
-
-  setPendedReasonSummary(pendedSummary);
+setPendedReasonSummary(summary);
 }
 // -------------------------------------------------------------------------------
 
@@ -285,6 +334,48 @@ setLatestProclaimCounts(latestDateCounts);
   ifpSummaryData.push(ifpGrandTotal);
 
   setIfpSummary(ifpSummaryData);
+
+
+
+  /* ── Member vs Provider (based on "Product" column) ─────────────── */
+{
+  const mpDirectors = ['Sagility', 'Concentrix', 'Wipro'];
+  const counts = mpDirectors.reduce(
+    (acc, d) => ({ ...acc, [d]: { Member: 0, Provider: 0 } }),
+    {}
+  );
+
+  json.forEach(row => {
+    const dir = (row['Director'] || '').trim();
+    const product = (row['Product'] || '').toLowerCase();
+
+    if (!mpDirectors.includes(dir)) return;
+
+    if (product.includes('mbr'))  counts[dir].Member   += 1;
+    if (product.includes('prov')) counts[dir].Provider += 1;
+  });
+
+  const summary = mpDirectors.map(d => ({
+    Department: d,
+    Member:     counts[d].Member,
+    Provider:   counts[d].Provider,
+    Total:      counts[d].Member + counts[d].Provider
+  }));
+
+  // Optional total row
+  const grand = {
+    Department: 'Total',
+    Member:   summary.reduce((s, r) => s + r.Member, 0),
+    Provider: summary.reduce((s, r) => s + r.Provider, 0),
+    Total:    summary.reduce((s, r) => s + r.Total, 0)
+  };
+  summary.push(grand);
+
+  setMemberProviderSummary(summary);
+}
+/* ──────────────────────────────────────────────────────────────── */
+
+
 
   // ✅ Director dropdown
   const allowedDirectors = ['Sagility', 'Concentrix', 'Wipro'];
@@ -659,79 +750,7 @@ useEffect(() => {
     return;
   }
 
-  const reasonsList = [
-    'Coder review',
-    'Sent for Adjustment',
-    'Committee',
-    'EMR ( Escalated mail review )',
-    'AOR verification',
-    'Mails to TPV',
-    'Pharmacy, Behavioral, Transplant & Dialysis'
-  ];
-  const directors = ['Sagility', 'Concentrix', 'Wipro'];
-
-  const getPeriodKey = (d, view) => {
-    if (view === 'Daily')  return d.toISOString().split('T')[0];
-    if (view === 'Weekly'){ const s=new Date(d); s.setDate(d.getDate()-d.getDay()); return s.toISOString().split('T')[0]; }
-    /* Monthly */          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-  };
-
-  // ⮕ counts per (period → reason → director)
-  const groups = {};
-
-  excelData.forEach((row, idx) => {
-    if ((row['Claim System'] || '').trim().toLowerCase() !== 'proclaim') return;
-    if (!(row['Department']   || '').toLowerCase().includes('appeal'))   return;
-    if ((row['Status']        || '').trim().toLowerCase() !== 'pended')  return;
-
-    const director = (row['Director'] || '').trim();
-    if (!directors.includes(director)) return;
-
-    // date → period key
-    let jsDate = null;
-    const rawDate = row['ReportDate'];
-    if (rawDate instanceof Date)            jsDate = rawDate;
-    else if (typeof rawDate === 'number')   jsDate = new Date((rawDate - 25569) * 86400 * 1000);
-    else if (typeof rawDate === 'string') { const p=new Date(rawDate); if(!isNaN(p)) jsDate=p; }
-    if (!jsDate) return;
-
-    const key = getPeriodKey(jsDate, trendView);
-
-    const rawReason = (row['Pend Reason'] || row['Pended Reason'] || '')
-                      .trim().toLowerCase();
-    let   reason = reasonsList.find(r => rawReason.includes(r.toLowerCase()));
-    if (!reason) reason = reasonsList[idx % reasonsList.length];
-
-    if (!groups[key])         groups[key] = {};
-    if (!groups[key][reason]) groups[key][reason] = { Sagility:0, Concentrix:0, Wipro:0 };
-
-    groups[key][reason][director] += 1;
-  });
-
-  // ⮕ summary for the latest period
-  const latestKey = trendView === 'Monthly'
-    ? Object.keys(groups).sort().pop()
-    : Object.keys(groups).sort((a,b)=>new Date(a)-new Date(b)).pop();
-
-  const pct = (n, d) => d ? ((n / d) * 100).toFixed(1) : '0.0';
-
-  const summary = reasonsList.map(r => {
-    const g = (groups[latestKey] && groups[latestKey][r]) ||
-              { Sagility:0, Concentrix:0, Wipro:0 };
-    const total = g.Sagility + g.Concentrix + g.Wipro;
-    return {
-      Reason:        r,
-      Sagility:      g.Sagility,
-      SagilityPct:   pct(g.Sagility, total),
-      Concentrix:    g.Concentrix,
-      ConcentrixPct: pct(g.Concentrix, total),
-      Wipro:         g.Wipro,
-      WiproPct:      pct(g.Wipro, total),
-      Total:         total
-    };
-  });
-
-  setPendedReasonSummary(summary);
+  /* full master reason list – keep order */
 }, [excelData, trendView]);
 /* --------------------------------------------------------------------------- */
 
@@ -989,7 +1008,7 @@ const sortIcon = (col) => {
       color: '#003b70',
       marginBottom: '16px'
     }}>
-      Pended Appeals Breakdown by Reason&nbsp;—&nbsp;{trendView}
+      Pended/Routed Appeals Breakdown by Reason&nbsp;—&nbsp;{trendView}
     </h4>
 
 
@@ -1237,6 +1256,259 @@ const sortIcon = (col) => {
         </div>
         )}
 
+
+
+{/* Member vs Provider – Product Field */}
+{memberProviderSummary.length > 0 && (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '20px',
+    fontFamily: 'Lexend, sans-serif'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      Member vs Provider Inventory
+    </h3>
+
+    <div style={{
+      marginTop: '0px',
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      padding: '24px',
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
+    }}>
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart
+          data={memberProviderSummary.filter(r => r.Department !== 'Total')}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="Department" tick={{ fontSize: 12 }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+          <Tooltip />
+          <Legend wrapperStyle={{ fontSize: '12px' }} />
+
+          <Bar dataKey="Member" fill="#1E88E5">
+            <LabelList dataKey="Member" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="Provider" fill="#7E57C2">
+            <LabelList dataKey="Provider" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+)}
+
+
+
+{/* IFP Inventory and Aging Percentage */}
+{ifpSummary.length > 0 && (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '20px',
+    fontFamily: 'Lexend, sans-serif',
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px'
+    }}>
+      IFP Inventory and Aging Percentage
+    </h3>
+
+    <div style={{ marginBottom: '12px' }}>
+      <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+        Filter by GSP:
+      </label>
+      <select
+        value={selectedIfpGsp}
+        onChange={(e) => setSelectedIfpGsp(e.target.value)}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: '1px solid #ccc',
+          fontSize: '14px',
+          width: '150px',
+          fontFamily: 'inherit',
+          color: '#003b70',
+          backgroundColor: '#fff',
+        }}
+      >
+        {['All', 'Sagility', 'Concentrix', 'Wipro'].map((gsp) => (
+          <option key={gsp} value={gsp}>{gsp}</option>
+        ))}
+      </select>
+    </div>
+
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: '#e8f0fe',
+      border: '1px solid #c4d4ec',
+      borderRadius: '8px',
+      padding: '16px',
+      marginBottom: '16px',
+      marginTop: '0px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
+    }}>
+<div style={{ fontSize: '16px', fontWeight: '600', color: '#003b70' }}>
+  Total IFP Appeals:
+<ul style={{
+  marginTop: '8px',
+  paddingLeft: '16px',
+  fontSize: '14px',
+  fontWeight: '500',
+  columnCount: 2,
+  columnGap: '40px',
+  maxHeight: '200px',
+  overflowY: 'auto',
+  listStyleType: 'disc'
+}}>
+  {Object.entries(
+    ifpRows
+      .filter(row => selectedIfpGsp === 'All' || (row['Director'] || '').trim() === selectedIfpGsp)
+      .reduce((acc, row) => {
+        const name = (row['Account Name'] || '').trim();
+        if (name) acc[name] = (acc[name] || 0) + 1;
+        return acc;
+      }, {})
+  ).map(([name, count]) => (
+    <li key={name}>{name}: {count}</li>
+  ))}
+</ul>
+
+</div>
+    </div>
+
+    <div style={{
+      marginTop: '20px',
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      padding: '24px',
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
+    }}>
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart
+          data={ifpSummary.filter(row =>
+            row.Department !== 'Total' &&
+            (selectedIfpGsp === 'All' || row.Department === selectedIfpGsp)
+          )}
+          margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="Department" tick={{ fontSize: 12 }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+          <Tooltip />
+          <Legend 
+            wrapperStyle={{ fontSize: '12px' }}
+            formatter={(value) => `${value} days`}
+          />
+
+          {orderedBucketColors
+            .filter(({ bucket }) =>
+              Object.keys(ifpSummary[0]).includes(bucket)
+            )
+            .map(({ bucket, color }) => (
+              <Bar key={bucket} dataKey={bucket} fill={color}>
+                <LabelList
+                  dataKey={bucket}
+                  position="top"
+                  style={{ fontSize: 10, fontWeight: 'bold' }}
+                />
+              </Bar>
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+)}
+
+
+
+
+{/* PG Name Summary  */}
+{filteredPgYesRows.length > 0 && (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '20px',
+    fontFamily: 'Lexend, sans-serif',
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      PG Name Summary
+    </h3>
+
+    <div style={{
+      backgroundColor: '#e8f0fe',
+      border: '1px solid #c4d4ec',
+      borderRadius: '8px',
+      padding: '16px',
+      marginBottom: '16px',
+      marginTop: '0px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
+    }}>
+      {/* headline */}
+      <div style={{
+        fontSize: '16px',
+        fontWeight: '600',
+        color: '#003b70',
+        marginBottom: '8px'
+      }}>
+        Total PG Names:
+      </div>
+
+      {/* bullet list – 2 columns */}
+<ul style={{
+  marginTop: '4px',
+  paddingLeft: '16px',
+  fontSize: '14px',
+  fontWeight: '500',
+  columnCount: 2,
+  columnGap: '40px',
+  maxHeight: '260px',
+  overflowY: 'auto',
+  overflowX: 'hidden',
+  wordWrap: 'break-word',
+  listStyleType: 'disc',
+  whiteSpace: 'normal',
+      }}>
+        {Object.entries(
+          filteredPgYesRows.reduce((acc, row) => {
+            const name = (row['PG NAME'] || row['PG Name'] || '').trim();
+            if (name) acc[name] = (acc[name] || 0) + 1;
+            return acc;
+          }, {})
+        )
+          .sort((a, b) => b[1] - a[1])                 // sort by count, descending
+          .map(([name, count]) => (
+            <li key={name}>{name}: {count}</li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+)}
 
 
        {/* Fully Insured Summary */}
@@ -1787,7 +2059,7 @@ const sortIcon = (col) => {
 
 
 
-{/* Impact section */}
+{/* Impact section
 {impactSummary.length > 0 && (
   <div style={{
     marginTop: '20px',
@@ -1917,135 +2189,12 @@ const sortIcon = (col) => {
 )}
 
   </div>
-)}
+)} */}
 
 
-{/* IFP Inventory and Aging Percentage */}
-{ifpSummary.length > 0 && (
-  <div style={{
-    marginTop: '20px',
-    marginLeft: '-30px',
-    backgroundColor: '#F5F6FA',
-    borderRadius: '10px',
-    padding: '20px',
-    fontFamily: 'Lexend, sans-serif',
-  }}>
-    <h3 style={{
-      fontSize: '19px',
-      fontWeight: '500',
-      color: '#003b70',
-      marginBottom: '10px'
-    }}>
-      IFP Inventory and Aging Percentage
-    </h3>
 
-    <div style={{ marginBottom: '12px' }}>
-      <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
-        Filter by GSP:
-      </label>
-      <select
-        value={selectedIfpGsp}
-        onChange={(e) => setSelectedIfpGsp(e.target.value)}
-        style={{
-          padding: '8px 12px',
-          borderRadius: '6px',
-          border: '1px solid #ccc',
-          fontSize: '14px',
-          width: '150px',
-          fontFamily: 'inherit',
-          color: '#003b70',
-          backgroundColor: '#fff',
-        }}
-      >
-        {['All', 'Sagility', 'Concentrix', 'Wipro'].map((gsp) => (
-          <option key={gsp} value={gsp}>{gsp}</option>
-        ))}
-      </select>
-    </div>
 
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      backgroundColor: '#e8f0fe',
-      border: '1px solid #c4d4ec',
-      borderRadius: '8px',
-      padding: '16px',
-      marginBottom: '16px',
-      marginTop: '0px',
-      boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
-    }}>
-<div style={{ fontSize: '16px', fontWeight: '600', color: '#003b70' }}>
-  Total IFP Appeals:
-<ul style={{
-  marginTop: '8px',
-  paddingLeft: '16px',
-  fontSize: '14px',
-  fontWeight: '500',
-  columnCount: 2,
-  columnGap: '40px',
-  maxHeight: '200px',
-  overflowY: 'auto',
-  listStyleType: 'disc'
-}}>
-  {Object.entries(
-    ifpRows
-      .filter(row => selectedIfpGsp === 'All' || (row['Director'] || '').trim() === selectedIfpGsp)
-      .reduce((acc, row) => {
-        const name = (row['Account Name'] || '').trim();
-        if (name) acc[name] = (acc[name] || 0) + 1;
-        return acc;
-      }, {})
-  ).map(([name, count]) => (
-    <li key={name}>{name}: {count}</li>
-  ))}
-</ul>
 
-</div>
-    </div>
-
-    <div style={{
-      marginTop: '20px',
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '24px',
-      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
-    }}>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart
-          data={ifpSummary.filter(row =>
-            row.Department !== 'Total' &&
-            (selectedIfpGsp === 'All' || row.Department === selectedIfpGsp)
-          )}
-          margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="Department" tick={{ fontSize: 12 }} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-          <Tooltip />
-          <Legend 
-            wrapperStyle={{ fontSize: '12px' }}
-            formatter={(value) => `${value} days`}
-          />
-
-          {orderedBucketColors
-            .filter(({ bucket }) =>
-              Object.keys(ifpSummary[0]).includes(bucket)
-            )
-            .map(({ bucket, color }) => (
-              <Bar key={bucket} dataKey={bucket} fill={color}>
-                <LabelList
-                  dataKey={bucket}
-                  position="top"
-                  style={{ fontSize: 10, fontWeight: 'bold' }}
-                />
-              </Bar>
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-)}
 
 
 
