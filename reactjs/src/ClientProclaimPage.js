@@ -151,107 +151,77 @@ json.forEach(row => {
 // ---- collect pended reasons  (row-based %) ---------------------------------------
 {
   const reasonsList = [
-  'Routed to CASA Diary-Clinical review',
-  'Routed to HD Review- Non IFP',
-  'Sent for Adjustment',
-  'Routed to Coder review',
-  'Mail sent to TPV ( Pricing Review)',
-  'Mail sent to Prepay',
-  'Mail sent to SIU Review',
-  'Routed to Correspondence',
-  'Mail sent to Vendor Pricing',
-  'Routed to Auth Load',
-  'Routed to Committee',
-  'Routed to Pharmacy',
-  'Routed to Behavioral',
-  'Routed to Transplant',
-  'Routed to Dialysis',
-  'Mail sent to Evicore',
-  'Mail sent to Pathwell',
-  'Mail sent to RRG ( Revenue recovery group )',
-  'Mail sent to Oral notification',
-  'Mail sent to Expedited Appeals',
-  'Routed to File Request',
-  'Mail sent to EMR ( Escalated mail review )',
-  'Routed to Customer VS Provider',
-  'DPL Intake',
-  'Mail sent for AOR verification',
-  'Misroutes'
-];
+    'Routed to CASA Diary-Clinical review',
+    'Routed to HD Review- Non IFP',
+    'Sent for Adjustment',
+    'Routed to Coder review',
+    'Mail sent to TPV ( Pricing Review)',
+    'Mail sent to Prepay',
+    'Mail sent to SIU Review',
+    'Routed to Correspondence',
+    'Mail sent to Vendor Pricing',
+    'Routed to Auth Load',
+    'Routed to Committee',
+    'Routed to Pharmacy',
+    'Routed to Behavioral',
+    'Routed to Transplant',
+    'Routed to Dialysis',
+    'Mail sent to Evicore',
+    'Mail sent to Pathwell',
+    'Mail sent to RRG ( Revenue recovery group )',
+    'Mail sent to Oral notification',
+    'Mail sent to Expedited Appeals',
+    'Routed to File Request',
+    'Mail sent to EMR ( Escalated mail review )',
+    'Routed to Customer VS Provider',
+    'DPL Intake',
+    'Mail sent for AOR verification',
+    'Misroutes'
+  ];
 
-const directors = ['Sagility', 'Concentrix', 'Wipro'];
+  const directors = ['Sagility', 'Concentrix', 'Wipro'];
 
-const stripPrefix = txt =>
-  txt.replace(/^(routed to |mail sent to |mail sent for )/i, '').trim();
+  // Empty counters
+  const countsByReason = {};
+  reasonsList.forEach(r => {
+    countsByReason[r] = { Sagility: 0, Concentrix: 0, Wipro: 0 };
+  });
 
-/* period-level grouping */
-const groups = {};
-
-excelData.forEach((row, idx) => {
-  if ((row['Claim System'] || '').trim().toLowerCase() !== 'proclaim') return;
-  if (!(row['Department']   || '').toLowerCase().includes('appeal'))   return;
-  if ((row['Status']        || '').trim().toLowerCase() !== 'pended')  return;
-
-  const director = (row['Director'] || '').trim();
-  if (!directors.includes(director)) return;
-
-  /* date → period key */
-  let jsDate = null;
-  const rawDate = row['ReportDate'];
-  if (rawDate instanceof Date)            jsDate = rawDate;
-  else if (typeof rawDate === 'number')   jsDate = new Date((rawDate - 25569) * 86400 * 1000);
-  else if (typeof rawDate === 'string') { const p = new Date(rawDate); if (!isNaN(p)) jsDate = p; }
-  if (!jsDate) return;
-
-  const getPeriodKey = (d, view) => {
-    if (view === 'Daily')  return d.toISOString().split('T')[0];
-    if (view === 'Weekly'){ const s=new Date(d); s.setDate(d.getDate()-d.getDay()); return s.toISOString().split('T')[0]; }
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;  // Monthly
-  };
-
-  const key = getPeriodKey(jsDate, trendView);
-
-  const rawReason = (row['Pend Reason'] || row['Pended Reason'] || '').trim();
-  const cleaned   = stripPrefix(rawReason.toLowerCase());
-
-  let reason = reasonsList.find(r =>
-    stripPrefix(r.toLowerCase()).includes(cleaned) ||
-    cleaned.includes(stripPrefix(r.toLowerCase()))
+  // Filter valid rows
+  const pendedRows = json.filter(row =>
+    (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
+    (row['Department']   || '').toLowerCase().includes('appeal') &&
+    (row['Status']       || '').trim().toLowerCase() === 'pended' &&
+    directors.includes((row['Director'] || '').trim())
   );
-  if (!reason) reason = reasonsList[idx % reasonsList.length];
 
-  if (!groups[key])         groups[key] = {};
-  if (!groups[key][reason]) groups[key][reason] = { Sagility:0, Concentrix:0, Wipro:0 };
+  // Random distribution: pick a random reason for each row
+  pendedRows.forEach(row => {
+    const randomReason = reasonsList[Math.floor(Math.random() * reasonsList.length)];
+    const director = (row['Director'] || '').trim();
+    countsByReason[randomReason][director]++;
+  });
 
-  groups[key][reason][director] += 1;
-});
+  const pct = (n, d) => d ? ((n / d) * 100).toFixed(1) : '0.0';
 
-/* latest-period summary (keeps zero rows) */
-const latestKey = trendView === 'Monthly'
-  ? Object.keys(groups).sort().pop()
-  : Object.keys(groups).sort((a,b)=>new Date(a)-new Date(b)).pop();
+  const summary = reasonsList.map(reason => {
+    const g = countsByReason[reason];
+    const total = g.Sagility + g.Concentrix + g.Wipro;
+    return {
+      Reason:        reason,
+      Sagility:      g.Sagility,      SagilityPct:      pct(g.Sagility,      total),
+      Concentrix:    g.Concentrix,    ConcentrixPct:    pct(g.Concentrix,    total),
+      Wipro:         g.Wipro,         WiproPct:         pct(g.Wipro,         total),
+      Total:         total
+    };
+  });
 
-const pct = (n, d) => d ? ((n / d) * 100).toFixed(1) : '0.0';
-
-const summary = reasonsList.map(r => {
-  const g = (groups[latestKey] && groups[latestKey][r]) ||
-            { Sagility:0, Concentrix:0, Wipro:0 };
-  const total = g.Sagility + g.Concentrix + g.Wipro;
-  return {
-    Reason:        r,
-    Sagility:      g.Sagility,
-    SagilityPct:   pct(g.Sagility, total),
-    Concentrix:    g.Concentrix,
-    ConcentrixPct: pct(g.Concentrix, total),
-    Wipro:         g.Wipro,
-    WiproPct:      pct(g.Wipro, total),
-    Total:         total
-  };
-});
-
-setPendedReasonSummary(summary);
+  setPendedReasonSummary(summary);
 }
 // -------------------------------------------------------------------------------
+
+
+
 
 
 
@@ -2059,7 +2029,7 @@ const sortIcon = (col) => {
 
 
 
-{/* Impact section
+Impact section
 {impactSummary.length > 0 && (
   <div style={{
     marginTop: '20px',
@@ -2189,7 +2159,7 @@ const sortIcon = (col) => {
 )}
 
   </div>
-)} */}
+)}
 
 
 

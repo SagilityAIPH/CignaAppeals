@@ -757,7 +757,7 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
     </h3>
 
 
-{/* === Case Status Filter (Open / Pended / Completed) === */}
+{/* === Case Status Filter (Open / Pended / Completed / FFup Sent) === */}
 <div style={{ marginBottom: '16px', width: '200px' }}>
   <label
     style={{
@@ -769,6 +769,7 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
   >
     Filter by Case Status:
   </label>
+
   <select
     value={caseStatusFilter}
     onChange={(e) => setCaseStatusFilter(e.target.value)}
@@ -784,8 +785,10 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
     <option value="Open">Open</option>
     <option value="Pended">Pended</option>
     <option value="Completed">Completed</option>
+    <option value="FFup Sent">FFup&nbsp;Sent</option>{/* ⬅️ NEW */}
   </select>
 </div>
+
 
 
 
@@ -1208,33 +1211,34 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
     const updated = preserviceRows.map(row => {
       const match = selectedRows.some(sel => sel['SR'] === row['SR']);
       if (match) {
-        return { ...row, OWNER_HELPER: 'PENDED' };
+        // ⬅️ NEW: flag as “FFup Sent” instead of “PENDED”
+        return { ...row, Status: 'FFup Sent' };
       }
       return row;
     });
 
-    setPreserviceRows(updated);
-    setSelectedRows([]);
-    setShowFollowUpModal(false);
-    setCurrentPage(1);
+    setPreserviceRows(updated);   // refresh grid
+    setSelectedRows([]);          // clear selection
+    setShowFollowUpModal(false);  // close modal
+    setCurrentPage(1);            // reset pagination
 
-    // 🔔 SHOW TOAST
+    // 🔔 toast
     setShowFollowToast(true);
-    setTimeout(() => setShowFollowToast(false), 3000); // 3 s then disappear
+    setTimeout(() => setShowFollowToast(false), 3000);
   }}
+  style={{
+    backgroundColor: '#ff9800',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  }}
+>
+  Yes, Send
+</button>
 
-          style={{
-            backgroundColor: '#ff9800',
-            color: 'white',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Yes, Send
-        </button>
         <button
           onClick={() => setShowFollowUpModal(false)}
           style={{
