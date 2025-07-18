@@ -37,6 +37,7 @@ const managerName =
     const [selectedRows, setSelectedRows] = useState([]);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
 const [showFollowToast, setShowFollowToast] = useState(false);
+const [assignmentFilter, setAssignmentFilter] = useState('All');
 
 // 👉 Pended-reason modal
 const [showPendReasonModal, setShowPendReasonModal] = useState(false);
@@ -232,7 +233,7 @@ const getOwnerHelperValue = (row) => {
 // === Filter rows by manager + Case Status ===
 const filteredPreserviceRows = useMemo(() => {
   return preserviceRows.filter((row) => {
-    /* ---------- Manager filter (always on) ---------- */
+    // Manager filter (always on)
     const managerKey = Object.keys(row).find(
       (k) => k.trim().toLowerCase() === 'manager'
     );
@@ -246,13 +247,21 @@ const filteredPreserviceRows = useMemo(() => {
     const managerMatch = rawManager === managerName?.toLowerCase();
     if (!managerMatch) return false;
 
-    /* ---------- Case Status filter ---------- */
-    if (caseStatusFilter === 'All') return true;
+    // === Independent Filters ===
+    const matchesCaseStatus =
+      caseStatusFilter === 'All' ||
+      String(row['Status'] || '').trim() === caseStatusFilter;
 
-    const statusValue = String(row['Status'] || '').trim(); // Excel key
-    return statusValue === caseStatusFilter;
+    const rawHelper = String(row['OWNER_HELPER'] || '').trim().toUpperCase();
+    const matchesAssignment =
+      assignmentFilter === 'All' ||
+      (assignmentFilter === 'Assigned' && rawHelper === 'ASSIGNED') ||
+      (assignmentFilter === 'Unassigned' && (rawHelper === '' || rawHelper === 'UNASSIGNED'));
+
+    return matchesCaseStatus && matchesAssignment;
   });
-}, [preserviceRows, managerName, caseStatusFilter]);
+}, [preserviceRows, managerName, caseStatusFilter, assignmentFilter]);
+
 
 
 
@@ -757,37 +766,79 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
     </h3>
 
 
-{/* === Case Status Filter (Open / Pended / Completed / FFup Sent) === */}
-<div style={{ marginBottom: '16px', width: '200px' }}>
-  <label
-    style={{
-      fontWeight: '500',
-      color: '#003b70',
-      display: 'block',
-      marginBottom: '4px'
-    }}
-  >
-    Filter by Case Status:
-  </label>
 
-  <select
-    value={caseStatusFilter}
-    onChange={(e) => setCaseStatusFilter(e.target.value)}
-    style={{
-      padding: '8px',
-      borderRadius: '6px',
-      border: '1px solid #ccc',
-      width: '100%',
-      fontFamily: 'inherit'
-    }}
-  >
-    <option value="All">All</option>
-    <option value="Open">Open</option>
-    <option value="Pended">Pended</option>
-    <option value="Completed">Completed</option>
-    <option value="FFup Sent">FFup&nbsp;Sent</option>{/* ⬅️ NEW */}
-  </select>
+
+
+
+
+
+
+
+
+<div style={{ marginBottom: '16px', display: 'flex', gap: '20px' }}>
+  {/* Case Status Filter */}
+  <div style={{ width: '200px' }}>
+    <label
+      style={{
+        fontWeight: '500',
+        color: '#003b70',
+        display: 'block',
+        marginBottom: '4px'
+      }}
+    >
+      Filter by Case Status:
+    </label>
+
+    <select
+      value={caseStatusFilter}
+      onChange={(e) => setCaseStatusFilter(e.target.value)}
+      style={{
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid #ccc',
+        width: '100%',
+        fontFamily: 'inherit'
+      }}
+    >
+      <option value="All">All</option>
+      <option value="Open">Open</option>
+      <option value="Pended">Pended</option>
+      <option value="Completed">Completed</option>
+      <option value="FFup Sent">FFup Sent</option>
+    </select>
+  </div>
+
+  {/* Assignment Filter */}
+  <div style={{ width: '200px' }}>
+    <label
+      style={{
+        fontWeight: '500',
+        color: '#003b70',
+        display: 'block',
+        marginBottom: '4px'
+      }}
+    >
+      Filter by Assignment:
+    </label>
+
+    <select
+      value={assignmentFilter}
+      onChange={(e) => setAssignmentFilter(e.target.value)}
+      style={{
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid #ccc',
+        width: '100%',
+        fontFamily: 'inherit'
+      }}
+    >
+      <option value="All">All</option>
+      <option value="Assigned">Assigned</option>
+      <option value="Unassigned">Unassigned</option>
+    </select>
+  </div>
 </div>
+
 
 
 
