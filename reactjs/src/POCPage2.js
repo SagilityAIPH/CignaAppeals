@@ -129,9 +129,9 @@ const [casesData, setCasesData] = useState([]);
 const [totalAppealCases, setTotalAppealCases] = useState([]);
 const [pageNumber, setPageNumber] = useState(1);
 const [pageSize, setPageSize] = useState(10);
-const [totalCount, setTotalCount] = useState(0);
+
 const [currentPage, setCurrentPage] = useState(1);
-const [totalRecords, setTotalRecords] = useState(0);
+
 const totalPages = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
 
 const [paginatedRows, setPaginatedRows] = useState([]);
