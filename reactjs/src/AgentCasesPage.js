@@ -12,6 +12,8 @@ import {
   LabelList,
 } from 'recharts';
 import { useLocation } from 'react-router-dom'; // ⬅️ Add this line at the top
+import axios from "axios";
+import { dataApiUrl } from './config';
 
 function AgentCasesPage() {
 const location = useLocation();
@@ -27,19 +29,31 @@ const location = useLocation();
     const [filterValue, setFilterValue] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);
     const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Open' | 'Completed'
-  const [showPendingModal, setShowPendingModal] = useState(false);
+const [showPendingModal, setShowPendingModal] = useState(false);
 const [showCompletedModal, setShowCompletedModal] = useState(false);
 const [pendingReason, setPendingReason] = useState('');
+const [caseTblAllAgent, setCaseTblAllAgent] = useState([]);
+const [casesData, setCasesData] = useState([]);
+const [totalAppealCases, setTotalAppealCases] = useState([]);
 
+const [pageNumber, setPageNumber] = useState(1);
+const [pageSize, setPageSize] = useState(10);
+const [totalCount, setTotalCount] = useState(0);
+const [currentPage, setCurrentPage] = useState(1);
+const [totalRecords, setTotalRecords] = useState(0);
+
+const [isFetchingAll, setIsFetchingAll] = useState(true);
+const [isFetchAllMode, setIsFetchAllMode] = useState(false);
+const [paginatedRows, setPaginatedRows] = useState([]);
+const totalPages = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
 // ─── Auto-fetch Excel once ───────────────────────────────────────────────
 useEffect(() => {
-  // use a flag so we only load once, even if the component remounts
   const autoLoadFlag = localStorage.getItem('autoLoadAgent');
-  if (autoLoadFlag === 'false') return;        // already fetched in this tab
+  if (autoLoadFlag === 'false') return;
 
-  localStorage.setItem('autoLoadAgent', 'false');   // mark as done
+  localStorage.setItem('autoLoadAgent', 'false');
 
-  const fileUrl = `${process.env.PUBLIC_URL}/Appeals_Sample.xlsx`;
+  const fileUrl = `${process.env.PUBLIC_URL}/template/Appeals_Sample.xlsx`;
 
   fetch(fileUrl)
     .then(res => res.arrayBuffer())
@@ -56,9 +70,8 @@ useEffect(() => {
         header: 1,
       });
 
-      if (json.length <= 1) return;            // nothing but headers
+      if (json.length <= 1) return;
 
-      // ── Normalise + map rows ───────────────────────────────────────────
       const [rawHeaders, ...rows] = json;
       const headers = rawHeaders.map(h => String(h || '').replace(/\s+/g, ' ').trim());
       const fixedData = rows.map(r =>
@@ -68,7 +81,6 @@ useEffect(() => {
       setPreserviceRows(fixedData);
       setPreserviceHeaders(headers);
 
-      // ── Build G&B summary (same logic as before) ──────────────────────
       const departments = ['Sagility', 'Concentrix', 'Wipro'];
       const grouped = {};
       const bucketKey = 'AGE_BUCKET';
@@ -106,7 +118,205 @@ useEffect(() => {
       setGnbSummary(summary);
     })
     .catch(err => console.error('❌ Failed to auto-load Excel:', err));
-}, []);           // ← runs once on mount
+
+  // ✅ Always run this
+
+
+}, []);
+        // ← runs once on mount
+
+
+// const fetchCasesAll = async () => {
+//   let allData = [];
+//   let page = 1;
+//   const tempPageSize = 100;
+//   let totalPages = 1;
+
+//   setIsFetchingAll(true); // ⬅️ Block other fetches
+
+//   try {
+//     while (page <= totalPages) {
+//       const res = await axios.post(`${dataApiUrl}cases_tbl_all_agent?pageNumber=${page}&pageSize=${tempPageSize}`, {
+//         agent: 'SG012166',
+//         caseStatus: statusFilter === 'All' ? '' : statusFilter
+//       });
+
+//       const { totalRecords, data } = res.data;
+//       allData = [...allData, ...data];
+
+//       if (page === 1) {
+//         totalPages = Math.ceil(totalRecords / tempPageSize);
+//         setTotalAppealCases(totalRecords);
+//       }
+
+//       page++;
+//     }
+
+//     //setCasesData(allData);
+//     setCaseTblAllAgent(allData);
+//   } catch (err) {
+//     if (err.response?.status === 404) {
+//       setCaseTblAllAgent([]);
+//       setTotalAppealCases(0);
+//     } else {
+//       console.error("Error fetching all pages:", err);
+//     }
+//     console.error("Error fetching all pages:", err);
+//   } finally {
+//     setIsFetchingAll(false); // ✅ Unblock other fetches
+//   }
+// };
+
+
+
+const fetchCasesPage = async (page = currentPage, size = pageSize) => {
+
+  try {
+    const res = await axios.post(`${dataApiUrl}cases_tbl_all_agent?pageNumber=${page}&pageSize=${size}`, {
+      agent: 'SG010521',
+      caseStatus: statusFilter === 'All' ? '' : statusFilter,
+      //assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter
+    });
+
+    const { totalRecords, data } = res.data;
+    setCaseTblAllAgent(data);                 // ✅ Use this instead
+    setTotalAppealCases(totalRecords);     // for pagination controls
+  } catch (err) {
+  
+    if (err.response?.status === 404) {
+      setCaseTblAllAgent([]);
+      setTotalAppealCases(0);
+    } else {
+      console.error("Error fetching all pages:", err);
+    }
+  } 
+};
+
+
+
+
+// Runs on page or pageSize change to fetch paginated data
+
+
+// Runs when statusFilter changes to reset page and fetch new data & counts
+
+useEffect(() => {
+  setCurrentPage(1);
+  fetchCasesPage(1, pageSize)
+  fetchStatusCounts();
+}, [statusFilter]);
+
+useEffect(() => {
+  fetchCasesPage(currentPage, pageSize);
+  fetchStatusCounts();
+}, [currentPage, pageSize]);
+
+
+
+useEffect(() => {
+  setCurrentPage(1);
+    fetchCasesPage(1, pageSize);
+    fetchStatusCounts();
+}, []);
+  
+
+// useEffect(() => {
+//     fetchAgents();
+// }, [showAssignModal, showFollowUpModal]);
+      
+const handleRefresh = async () => {
+  fetchCasesPage(1, pageSize)
+         setStatusFilter("All");
+         setPageSize(10); 
+};
+
+
+// useEffect(() => {
+//   if (!Array.isArray(caseTblAllAgent) || caseTblAllAgent.length === 0 || !pageSize) return;
+
+//   const start = (currentPage - 1) * pageSize;
+//   const end = start + pageSize;
+//   setPaginatedRows(caseTblAllAgent.slice(start, end));
+// }, [caseTblAllAgent, currentPage, pageSize]);
+
+
+
+const handleStatusFilterChange = (newFilter) => {
+  setStatusFilter(newFilter);
+  setCurrentPage(1);
+
+  if (newFilter === 'All') {
+    setIsFetchAllMode(true);       // 👈 Switch to full fetch
+    //fetchCasesAll();
+  } else {
+    setIsFetchAllMode(false);      // 👈 Stay paginated
+    //fetchCasesAll();
+  }
+
+  fetchStatusCounts(); // optional if you need to refresh counts
+};
+
+
+const fetchCaseDetailsById = async (id) => {
+  try {
+    const response = await axios.get(`${dataApiUrl}cases_view_per_id/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch case details:", error);
+    return null;
+  }
+};
+
+
+
+const [statusCounts, setStatusCounts] = useState({
+  completed: 0,
+  pended: 0,
+  ff_sent: 0,
+  open: 0,
+  assigned: 0,
+  unassigned: 0,
+  total_Count: 0,
+});
+
+const fetchStatusCounts = async () => {
+  const agent = 'SG010521';
+
+  try {
+    const res = await axios.get(`${dataApiUrl}get_cases_status_agent_ct`, {
+      params: { agent }
+    });
+
+    const data = res.data;
+
+    if (data) {
+      setStatusCounts({
+        completed: data.completed || 0,
+        pended: data.pended || 0,
+        ff_sent: data.fFup_Sent || 0,
+        open: data.open || 0,
+        assigned: data.assigned || 0,
+        unassigned: data.unassigned || 0,
+        total_Count: data.total_Count || 0,
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching case status counts:', error);
+    setStatusCounts({
+      completed: 0,
+      pended: 0,
+      ff_sent: 0,
+      open: 0,
+      assigned: 0,
+      unassigned: 0,
+      total_Count: 0,
+    });
+  }
+};
+
+
+
+
 
 
     // ✅ Reset to page 1 when filters change
@@ -120,7 +330,7 @@ useEffect(() => {
   ];
 
 const preserviceColumnMap = {
-  'Age Cal': 'AGE',
+  'Age_Cal': 'AGE',
   'SR': 'SR.',
   'Manager': 'Manager',
   'AGE_PROMISE_BUCKET': 'PROMISE',
@@ -133,9 +343,119 @@ const preserviceColumnMap = {
   'OwnerID': 'OwnerID',
   'OwnerName': 'Owner' // ← most likely this is the correct field
 };
+    
+  const caseTblAllColumnMap = {
+    id: "Id",
+    age_Cal: "Age (Days)",
+    sr: "SR",
+    manager: "Manager",
+    agE_PROMISE: "Promise",
+    promise_Date: "Promise Date",
+    recd_By_Cigna: 'Rec\'d',
+    system: "System",
+    lpi: "LPI",
+    pg: "PG",
+    pG_NAME: "PG Name",
+    ownerID: "Owner ID",
+    ownerName: "Owner Name",
+    appealStatus: "Status"
   
+    //id: "Case ID", // optional: hidden from UI if not needed
+  };
+
+  const viewAllDisplayMap = {
+      id: "Case ID",
+      sr: "SR",
+      partName: "Part Name",
+      promise_Date: "Promise Date",
+      manager: "Manager",
+      ownerName: "Owner Name",
+      participant_Id: "Participant ID",
+      funding_Type: "Funding Type",
+      product: "Product",
+      root_Cause: "Root Cause",
+      account_Name: "Account Name",
+      state: "State",
+      recd_By_Cigna: "Received by Cigna",
+      appealType: "Appeal Type",
+      appeal_Category: "Appeal Category",
+      age_Cal: "Age (Calendar)",
+      age_Bus: "Age (Business)",
+      system: "System",
+      department: "Department",
+      director: "Director",
+      ownerID: "Owner ID",
+      appeal_Service: "Appeal Service",
+      reportDate: "Report Date",
+      recd_by_Appeals: "Received by Appeals",
+      location: "Location",
+      hmo: "HMO",
+      claim_System: "Claim System",
+      total: "Total",
+      age0_5: "Age 0-5",
+      age6_10: "Age 6-10",
+      age11_15: "Age 11-15",
+      age16_21: "Age 16-21",
+      age22_26: "Age 22-26",
+      age27_30: "Age 27-30",
+      age_Over30: "Age Over 30",
+      lateReceipts2: "Late Receipts 2",
+      nonCompliant2: "Non-Compliant 2",
+      nonCompliant: "Non-Compliant",
+      lateReceipts: "Late Receipts",
+      na: "N/A",
+      iTrackDescription: "iTrack Description",
+      svC_REQ_OUTSTDG_CNT: "Service Request Outstanding Count",
+      svC_REQ_RETND_CNT: "Service Request Returned Count",
+      role: "Role",
+      role2: "Role 2",
+      function: "Function",
+      role_NM: "Role Name",
+      wrK_GRP_DESC: "Work Group Description",
+      fU_FREE_FORM_TXT: "Follow-Up Free Text",
+      providerID: "Provider ID",
+      account: "Account",
+      maxOfClaim: "Max of Claim",
+      upload_date: "Upload Date",
+      appealStatus: "Case Status",
+      update_date: "Update Date",
+      was_item_on_previous_report: "Previously Reported",
+      agE_HELPER: "Age Helper",
+      agE_HELPER2: "Age Helper 2",
+      agE_BUCKET: "Age Bucket",
+      rootcausE_HELPER: "Root Cause Helper",
+      lpi: "LPI",
+      pg: "PG",
+      pG_NAME: "PG Name",
+      pingPong: "Ping Pong",
+      reassignedTo: "Reassigned To",
+      rolE_FILTER1: "Role Filter 1",
+      rolE_FILTER2: "Role Filter 2",
+      rolE_FILTER3: "Role Filter 3",
+      rolE_FILTER4: "Role Filter 4",
+      rolE_FILTER5: "Role Filter 5",
+      owneR_HELPER: "Owner Helper",
+      fundinG_HELPER: "Funding Helper",
+      agE_PROMISE: "Age Promise",
+      agE_PROMISE_BUCKET: "Age Promise Bucket",
+      membR_STE: "Member State",
+      appeL_STE: "Appeal State",
+      cusT_PG: "Customer PG",
+      proV_PG: "Provider PG",
+      pG_NAME2: "PG Name 2",
+      pG_ASSIGN: "PG Assign",
+      ytD_percent: "YTD %",
+      pG_YTD_RESULT: "PG YTD Result",
+      recd_date_flag: "Received Date Flag",
+      case_assignment_status: "Case Assignment Status",
+      pend_reason: "Pending Reason"
+    };
+    
+  
+
+
 const resolveExcelHeader = (friendlyHeader) => {
-  const found = Object.entries(preserviceColumnMap).find(
+  const found = Object.entries(caseTblAllColumnMap).find(
     ([excelKey, displayName]) =>
       displayName.trim().toLowerCase() === friendlyHeader.trim().toLowerCase()
   );
@@ -185,7 +505,7 @@ const ownerName = (row['OwnerName'] || '').trim().toUpperCase();
 if (statusFilter === 'All') return true;
 if (statusFilter === 'Open') return status !== 'COMPLETED' && status !== 'PENDING';
 if (statusFilter === 'Completed') return status === 'COMPLETED';
-if (statusFilter === 'Pending') return status === 'PENDING';
+if (statusFilter === 'Pended') return status === 'PENDED';
   return false;
 });
 
@@ -227,28 +547,25 @@ if (filterColumn && filterValue) {
 
 
 
-
-const [currentPage, setCurrentPage] = useState(1);
+//const [currentPage, setCurrentPage] = useState(1);
 const rowsPerPage = 25;
-const totalPages = Math.ceil(filteredPreserviceRows.length / rowsPerPage);
-const paginatedRows = filteredPreserviceRows.slice(
-  (currentPage - 1) * rowsPerPage,
-  currentPage * rowsPerPage
-);
+const totalPages2 = Math.ceil(filteredPreserviceRows.length / rowsPerPage);
+// const paginatedRows = filteredPreserviceRows.slice(
+//   (currentPage - 1) * rowsPerPage,
+//   currentPage * rowsPerPage
+// );
 
-const isAllSelected = paginatedRows.length > 0 && paginatedRows.every(row =>
-  selectedRows.some(selected => selected['SR'] === row['SR'])
-);
+const isAllSelected = caseTblAllAgent.length > 0 && selectedRows.length === caseTblAllAgent.length;
 
 const toggleSelectAll = () => {
   if (isAllSelected) {
     setSelectedRows([]);
   } else {
-    setSelectedRows(paginatedRows);
+    setSelectedRows(caseTblAllAgent);
   }
 };
 
-const toggleRowSelection = (row) => {
+const toggleRowSelection2 = (row) => {
   const exists = selectedRows.some(selected => selected['SR'] === row['SR']);
   if (exists) {
     setSelectedRows(prev => prev.filter(selected => selected['SR'] !== row['SR']));
@@ -256,6 +573,50 @@ const toggleRowSelection = (row) => {
     setSelectedRows(prev => [...prev, row]);
   }
 };
+
+const toggleRowSelection = (row) => {
+  setSelectedRows(prevSelected => {
+    const exists = prevSelected.some(r => r.id === row.id);
+    if (exists) {
+      // Remove from selected
+      return prevSelected.filter(r => r.id !== row.id);
+    } else {
+      // Add to selected
+      return [...prevSelected, row];
+    }
+  });
+};
+
+const handleUpdateCaseStatus = async ({ status, pendingReason = "" }) => {
+  if (selectedRows.length === 0) {
+    alert("Please select at least one case.");
+    return;
+  }
+
+  const idsToUpdate = selectedRows.map(row => Number(row.id)).filter(id => id > 0);
+
+  if (idsToUpdate.length === 0) {
+    alert("Selected cases have invalid IDs.");
+    return;
+  }
+
+  try {
+    await axios.post(`${dataApiUrl}appeal_cases_status_update`, {
+      ids: idsToUpdate,
+      status,
+      pend_reason: pendingReason
+    });
+
+    await fetchCasesPage(currentPage, pageSize);         // Refresh case data
+    await fetchStatusCounts();  // Refresh counts
+    setSelectedRows([]);
+    alert(`Status updated to ${status} successfully.`);
+  } catch (error) {
+    console.error(`Failed to update case status to ${status}:`, error);
+    alert(`Failed to update case status to ${status}.`);
+  }
+};
+
 
 
 
@@ -428,18 +789,25 @@ const ownedRows = preserviceRows.filter(
   r => validOwners.some(name => normalize(r['OwnerName']).includes(name))
 );
 
-    const completed = ownedRows.filter(r => getOwnerHelperValue(r) === 'COMPLETED').length;
-    const pending = ownedRows.filter(r => getOwnerHelperValue(r) === 'PENDING').length;
-    const open = ownedRows.filter(r => {
-      const status = getOwnerHelperValue(r);
-      return status !== 'COMPLETED' && status !== 'PENDING';
-    }).length;
+    // const completed = ownedRows.filter(r => getOwnerHelperValue(r) === 'COMPLETED').length;
+    // const pending = ownedRows.filter(r => getOwnerHelperValue(r) === 'PENDING').length;
+    // const open = ownedRows.filter(r => {
+    //   const status = getOwnerHelperValue(r);
+    //   return status !== 'COMPLETED' && status !== 'PENDING';
+    // }).length;
 
-    const total = ownedRows.length;
+    // const total = ownedRows.length;
+
+    const completed = statusCounts.completed
+    const pended = statusCounts.pended
+    const ff_sent = statusCounts.ff_sent
+    const open = statusCounts.open
+    const total = statusCounts.total_Count
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return (
       <>
+      
         <div style={{ marginBottom: '8px' }}>
           <span role="img" aria-label="folder">📁</span> Total Cases:{' '}
           <strong>{total}</strong>
@@ -456,8 +824,13 @@ const ownedRows = preserviceRows.filter(
         </div>
 
         <div style={{ marginBottom: '12px' }}>
-          <span role="img" aria-label="pause">📦</span> Pending:{' '}
-          <strong>{pending}</strong>
+          <span role="img" aria-label="pause">📦</span> Pended:{' '}
+          <strong>{pended}</strong>
+        </div>
+
+        <div style={{ marginBottom: '12px' }}>
+          <span role="img" aria-label="pause">📧</span> FFup Sent:{' '}
+          <strong>{ff_sent}</strong>
         </div>
 
         {/* Progress Bar */}
@@ -601,7 +974,7 @@ const ownedRows = preserviceRows.filter(
     fontWeight: '600',
     color: '#003b70'
   }}>
-    Total Appeal Cases: {filteredPreserviceRows.length}
+    Total Appeal Cases: {totalAppealCases}
   </div>
 
   <div style={{ display: 'flex', gap: '10px' }}>
@@ -647,35 +1020,77 @@ const ownedRows = preserviceRows.filter(
 
 
 
+<div style={{ display: 'flex', alignItems: 'flex-end', gap: '24px', marginBottom: '16px' }}>
+  {/* Filter by Status */}
+  <div style={{ width: '200px' }}>
+    <label
+      style={{
+        fontWeight: '500',
+        color: '#003b70',
+        display: 'block',
+        marginBottom: '4px'
+      }}
+    >
+      Filter by Status:
+    </label>
+    <select
+      value={statusFilter}
+      onChange={(e) => setStatusFilter(e.target.value)}
+      style={{
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid #ccc',
+        width: '100%',
+        fontFamily: 'inherit'
+      }}
+    >
+      <option value="All">All</option>
+      <option value="Open">Open</option>
+      <option value="Completed">Completed</option>
+      <option value="Pended">Pended</option>
+    </select>
+  </div>
 
-<div style={{ marginBottom: '16px', width: '200px' }}>
-  <label
-    style={{
-      fontWeight: '500',
-      color: '#003b70',
-      display: 'block',
-      marginBottom: '4px'
-    }}
-  >
-    Filter by Status:
-  </label>
-  <select
-    value={statusFilter}
-    onChange={(e) => setStatusFilter(e.target.value)}
-    style={{
-      padding: '8px',
-      borderRadius: '6px',
-      border: '1px solid #ccc',
-      width: '100%',
-      fontFamily: 'inherit'
-    }}
-  >
-    <option value="All">All</option>
-    <option value="Open">Open</option>
-    <option value="Completed">Completed</option>
-    <option value="Pending">Pending</option>
-  </select>
+  {/* Rows Per Page */}
+  <div style={{ display: 'flex', flexDirection: 'column', width: '150px' }}>
+    <label
+      htmlFor="pageSize"
+      style={{
+        fontWeight: '500',
+        color: '#003b70',
+        marginBottom: '4px'
+      }}
+    >
+      Rows per page:
+    </label>
+    <select
+      id="pageSize"
+      value={pageSize === 0 ? '' : pageSize}  // show '' if 0 means all
+      onChange={(e) => {
+        const val = e.target.value;
+
+          setPageSize(parseInt(val, 10));
+          setCurrentPage(1);
+      
+      }}
+      style={{
+        padding: '8px',
+        borderRadius: '4px',
+        border: '1px solid #ccc',
+        fontFamily: 'inherit',
+        width: '100%'
+      }}
+    >
+      {[10, 30, 50].map(size => (
+        <option key={size} value={size}>{size}</option>
+      ))}
+</select>
+
+  </div>
 </div>
+
+
+
 
 
 
@@ -704,75 +1119,97 @@ const ownedRows = preserviceRows.filter(
         onChange={toggleSelectAll}
       />
     </th>
-    {Object.values(preserviceColumnMap).map((header) => (
-      <th key={header} style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
+    {Object.values(caseTblAllColumnMap).map((header) => (
+      <th key={header} style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'center' }}>
         {header}
       </th>
     ))}
-<th style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
-  Status
-</th>
-<th style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'left' }}>
+
+<th style={{ padding: '8px', border: '1px solid #ccc', fontWeight: '600', textAlign: 'center' }}>
   Actions
 </th>
   </tr>
 </thead>
-
 <tbody>
-  {paginatedRows.map((row, idx) => {
-    const isChecked = selectedRows.some(selected => selected['SR'] === row['SR']);
-    return (
-      <tr key={idx}>
-        <td style={{ padding: '8px', border: '1px solid #eee' }}>
-          <input
-            type="checkbox"
-            checked={isChecked}
-            onChange={() => toggleRowSelection(row)}
-          />
-        </td>
-{Object.keys(preserviceColumnMap).map((excelKey) => (
-  <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
-    {preserviceDateFields.includes(excelKey)
-      ? formatExcelDate(row[excelKey])
-      : (row[excelKey] ?? '')}
-  </td>
-))}
+  {caseTblAllAgent.length === 0 ? (
+    <tr>
+      <td
+        colSpan={Object.keys(caseTblAllColumnMap).length + 2} // +1 for checkbox, +1 for actions
+        style={{
+          padding: '16px',
+          textAlign: 'center',
+          fontStyle: 'italic',
+          color: '#666',
+          border: '1px solid #eee',
+        }}
+      >
+        No results found.
+      </td>
+    </tr>
+  ) : (
+    caseTblAllAgent.map((row, idx) => {
+      const isChecked = selectedRows.some(selected => selected['id'] === row['id']);
 
-{/* ✅ Status Column */}
-<td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '500' }}>
-  {(() => {
-    const status = (row['OWNER_HELPER'] || '').trim().toUpperCase();
-    if (status === 'COMPLETED') return 'COMPLETED';
-    if (status === 'PENDING') return 'PENDING';
-    return 'OPEN';
-  })()}
-</td>
+      return (
+        <tr key={row.id}
+        style={{
+          padding: '8px',
+          border: '1px solid #eee',
+          width: '40px',            // same fixed width
+          textAlign: 'center',      // center horizontally
+          verticalAlign: 'middle'   // center vertically
+        }}
+        >
+          {/* Checkbox */}
+          <td >
+        <input
+          type="checkbox"
+         checked={selectedRows.some(selected => selected.id === row.id)}
+          onChange={() => toggleRowSelection(row)}
+        />
+          </td>
 
-{/* ✅ Actions Column */}
-<td style={{ padding: '8px', border: '1px solid #eee' }}>
-  <button
-    onClick={() => {
-      setSelectedRow(row);
-      setShowModal(true);
-    }}
-    style={{
-      backgroundColor: '#0071ce',
-      color: 'white',
-      border: 'none',
-      padding: '6px 12px',
-      borderRadius: '4px',
-      fontSize: '12px',
-      cursor: 'pointer'
-    }}
-  >
-    View
-  </button>
-</td>
+          {/* Data columns */}
+          {Object.keys(caseTblAllColumnMap).map((excelKey) => (
+            <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
+              {preserviceDateFields.includes(excelKey)
+                ? formatExcelDate(row[excelKey])
+                : row[excelKey] ?? ''}
+            </td>
+          ))}
 
-      </tr>
-    );
-  })}
+          {/* Actions */}
+          <td style={{ padding: '8px', border: '1px solid #eee' }}>
+            <button
+              onClick={async () => {
+                const details = await fetchCaseDetailsById(row.id);
+                if (details) {
+                  setSelectedRow(details);   // updates your modal content
+                  setShowModal(true);
+                } else {
+                  alert("Failed to load case details.");
+                }
+              }}
+              style={{
+                backgroundColor: '#0071ce',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              View
+            </button>
+          </td>
+        </tr>
+      );
+    })
+  )}
 </tbody>
+
+
 
 
 
@@ -780,19 +1217,13 @@ const ownedRows = preserviceRows.filter(
   </div>
 
   {/* Pagination Controls */}
-  <div style={{
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '12px',
-    gap: '12px',
-    backgroundColor: '#f9fbff',
-    borderTop: '1px solid #ddd'
-  }}>
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '12px', gap: '12px', backgroundColor: '#f9fbff', borderTop: '1px solid #ddd' }}>
     <button
       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
       disabled={currentPage === 1}
       style={{
+        backgroundColor: "#0071ce",
+        color: "white",
         padding: '6px 12px',
         borderRadius: '6px',
         border: '1px solid #ccc',
@@ -803,13 +1234,17 @@ const ownedRows = preserviceRows.filter(
     >
       Previous
     </button>
+
     <span style={{ fontWeight: '500', color: '#003b70' }}>
-      Page {currentPage} of {totalPages}
+      Page {currentPage} of {totalPages || 1}
     </span>
+
     <button
       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
       disabled={currentPage === totalPages}
       style={{
+        backgroundColor: "#0071ce",
+        color: "white",
         padding: '6px 12px',
         borderRadius: '6px',
         border: '1px solid #ccc',
@@ -821,6 +1256,7 @@ const ownedRows = preserviceRows.filter(
       Next
     </button>
   </div>
+
 </div>
 
 
@@ -865,9 +1301,10 @@ const ownedRows = preserviceRows.filter(
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
         <tbody>
           {Object.entries(selectedRow).map(([key, value]) => {
+            const displayKey = viewAllDisplayMap[key] || key;
             const displayValue = preserviceDateFields.includes(key)
               ? formatExcelDate(value)
-              : value;
+              : (value === null || value === undefined || value === '' ? '-' : value);
 
             if (
               displayValue === null ||
@@ -878,10 +1315,10 @@ const ownedRows = preserviceRows.filter(
             return (
               <tr key={key}>
                 <td style={{ fontWeight: '600', padding: '6px', borderBottom: '1px solid #eee', width: '40%' }}>
-                  {key}
+                  {displayKey}
                 </td>
                 <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>
-                  {displayValue}
+                  {displayValue} 
                 </td>
               </tr>
             );
@@ -989,18 +1426,19 @@ const ownedRows = preserviceRows.filter(
         <button
           onClick={() => {
             const updated = preserviceRows.map(row => {
-              const match = selectedRows.some(sel => sel['SR'] === row['SR']);
+              const match = selectedRows.some(sel => sel['id'] === row['id']);
               if (match) {
-                return { ...row, OWNER_HELPER: 'PENDING', PENDING_REASON: pendingReason };
+                return { ...row, OWNER_HELPER: 'Pended', PENDING_REASON: pendingReason };
               }
               return row;
             });
-
+            handleUpdateCaseStatus({ status: "Pended", pendingReason });
             setPreserviceRows(updated);
             setSelectedRows([]);
             setCurrentPage(1);
             setPendingReason('');
             setShowPendingModal(false);
+           
           }}
           disabled={pendingReason.trim() === ''}
           style={{
@@ -1064,7 +1502,7 @@ const ownedRows = preserviceRows.filter(
               }
               return row;
             });
-
+            handleUpdateCaseStatus({ status: "Completed" });
             setPreserviceRows(updated);
             setSelectedRows([]);
             setCurrentPage(1);

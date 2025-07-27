@@ -59,7 +59,7 @@ useEffect(() => {
     localStorage.setItem("autoLoadTeamLead", "false");
 
     // Auto-fetch from public Excel path
-    const fileUrl = process.env.PUBLIC_URL + '/Appeals_Sample.xlsx'; 
+    const fileUrl = process.env.PUBLIC_URL + '/template/Appeals_Sample.xlsx'; 
   fetch(fileUrl)
       .then((res) => res.arrayBuffer())
       .then((buffer) => {

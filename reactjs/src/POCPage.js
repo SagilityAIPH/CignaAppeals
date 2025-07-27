@@ -18,6 +18,11 @@ import {
 /* ----------------------------- SAMPLE DATA -------------------------------- */
 // Hard-coded age-bucket numbers for the preview.
 // Replace these with live data once the Excel parsing is wired up.
+
+
+const dataApiUrl =
+"https://uat-cg-lpi-portal.sagilityhealth.com:8081/api/AppealsIssue/";
+
 const SAMPLE_GNB_SUMMARY = [
   {
     Department: "Sagility",
@@ -247,6 +252,9 @@ const handleFileSelect = (e) => {
       }
     }
   };
+
+
+  
 
   reader.readAsArrayBuffer(file);
 
