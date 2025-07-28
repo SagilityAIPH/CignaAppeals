@@ -46,18 +46,6 @@ let SAMPLE_GNB_SUMMARY = [
     Total: 0
   },
   {
-    Department: "Wipro",
-    "0-14": 0,
-    "15-29": 0,
-    "30-44": 0,
-    "45-59": 0,
-    "60-89": 0,
-    "90-179": 0,
-    "180-364": 0,
-    "365+": 0,
-    Total: 0,
-  },
-  {
     Department: "Total",
     "0-14": 0,
     "15-29": 0,
@@ -143,7 +131,8 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   //const [showSuccessUpload, setShowSuccessUpload] = useState(false);
   const [startHideUploadPanelTimer, setStartHideUploadPanelTimer] = useState(false);
   const serverAPI = "https://uat-cg-lpi-portal.sagilityhealth.com:8081/";
-
+  const [departmentList, setDepartmentList] = useState([]);
+  const [ageSummary, setAgeSummary] = useState([]);
   const bulkUpdateCases = (actionType) => {
     const updatedRows = preserviceRows.map((row) => {
       if (selectedRows.includes(row)) {
@@ -364,12 +353,28 @@ const toggleRowSelection = (row) => {
 
 
 
-const fetchAgents = async () => {
+const fetchAgents2 = async () => {
   try {
     const response = await axios.get(`${dataApiUrl}appeals_agents_list`);
     setAgentList(response.data || []);
   } catch (error) {
     console.error("Failed to fetch agents", error);
+  }
+};
+
+const fetchAgents = async () => {
+  try {
+    const response = await axios.get(`${dataApiUrl}appeals_agents_list`);
+    const agents = response.data || [];
+
+    // Filter agents whose account matches any of the values in departmentList
+    const matchedAgents = agents.filter(agent =>
+      departmentList.includes(agent.account)
+    );
+
+    setAgentList(matchedAgents);
+  } catch (error) {
+    console.error("Failed to fetch or filter agents by account", error);
   }
 };
 
@@ -385,7 +390,7 @@ const fetchCasesAll = async () => {
   try {
     while (page <= totalPages) {
       const res = await axios.post(`${dataApiUrl}cases_tbl_all_poc?pageNumber=${page}&pageSize=${tempPageSize}`, {
-        poc: '',
+        poc: 'M132305',
         caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
         assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter
       });
@@ -419,7 +424,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
   setIsLoading(true);
   try {
     const res = await axios.post(`${dataApiUrl}cases_tbl_all_poc?pageNumber=${page}&pageSize=${size}`, {
-      poc: '',
+      poc: 'M132305',
       caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
       assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter
     });
@@ -462,6 +467,13 @@ useEffect(() => {
     fetchCasesPage(1, pageSize)
     setUploadComplete(true); // Reset upload state on mount
 }, []);
+
+
+useEffect(() => {
+  if (departmentList.length > 0) {
+    fetchAgents();
+  }
+}, [departmentList]);
   
 useEffect(() => {
   if (startHideUploadPanelTimer) {
@@ -512,31 +524,43 @@ const fetchCaseDetailsById = async (id) => {
 };
 
 const fetchAgeBuckets = async () => {
-  try {
-    const res = await axios.get(`${dataApiUrl}get_age_bucket_poc`);
+  const poc_id = "M132305";
 
-    //setSummaryData(res.data); 
-    
-    
-    SAMPLE_GNB_SUMMARY = res.data.map((item) => ({
-      Department: item.department,
-      "0-14": item.ab0_14,
-      "15-29": item.ab15_29,
-      "30-44": item.ab30_44,
-      "45-59": item.ab45_59,
-      "60-89": item.ab60_89,
-      "90-179": item.ab90_179,
-      "180-364": item.ab180_364,
-      "365+": item.ab365_Plus,
-      Total: item.total
-    }));
-    
-    // Now contains [{ Department, Ab0_14, ..., Total }]
+  try {
+    const res = await axios.get(`${dataApiUrl}get_age_bucket_poc?poc=${poc_id}`);
+    const data = res.data || [];
+
+    // For filtering
+    const departments = [
+      ...new Set(
+        data
+          .map(item => item.department)
+          .filter(dep => dep && dep.toLowerCase() !== "total")
+      )
+    ];
+    setDepartmentList(departments);
+
+    // For summary display (includes Total)
+    setAgeSummary(
+      data.map(item => ({
+        Department: item.department,
+        "0-14": item.ab0_14,
+        "15-29": item.ab15_29,
+        "30-44": item.ab30_44,
+        "45-59": item.ab45_59,
+        "60-89": item.ab60_89,
+        "90-179": item.ab90_179,
+        "180-364": item.ab180_364,
+        "365+": item.ab365_Plus,
+        Total: item.total
+      }))
+    );
   } catch (error) {
     console.error("Error fetching age bucket summary:", error);
-    // fallback to empty on failure
+    setAgeSummary([]);
   }
 };
+
 
 
   // const filteredPreserviceRows = useMemo(() => {
@@ -636,30 +660,30 @@ const fetchAgeBuckets = async () => {
     const formData = new FormData();
     formData.append('file', file); // This key name 'file' must match your C# API's parameter
   
-    // try {
-    //   const res = await axios.post(
-    //     serverAPI + 'api/Uploader/UploadAppeals/',
-    //     formData,
-    //     {
-    //       headers: {
-    //         'Content-Type': 'multipart/form-data'
-    //       },
-    //       onUploadProgress: (progressEvent) => {
-    //         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-    //         setUploadProgress(percent);
-    //       },
-    //     }
-    //   );
-    //   await axios.get(`${serverAPI}api/Issue/sp_appeals`);
-    //   didMountRef.current = true;
-    //   setCurrentPage(1); // optional: if you want to jump to first page
-    //   //await fetchCasesAll();
-    //   await fetchCasesPage(1, pageSize);
-    //   await fetchAgeBuckets();
-    //   console.log("Upload successful:", res.data);
-    // } catch (err) {
-    //   console.error("Error uploading file:", err);
-    // }
+    try {
+      const res = await axios.post(
+        serverAPI + 'api/Uploader/UploadAppeals/',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percent);
+          },
+        }
+      );
+      await axios.get(`${serverAPI}api/Issue/sp_appeals`);
+      didMountRef.current = true;
+      setCurrentPage(1); // optional: if you want to jump to first page
+      //await fetchCasesAll();
+      await fetchCasesPage(1, pageSize);
+      await fetchAgeBuckets();
+      console.log("Upload successful:", res.data);
+    } catch (err) {
+      console.error("Error uploading file:", err);
+    }
   };
   
   const handleUpdateAssignedStatus = async ({ status }) => {
@@ -1160,7 +1184,7 @@ const handleReassignAppeals = async () => {
               </tr>
             </thead>
             <tbody>
-              {SAMPLE_GNB_SUMMARY.map((row, idx) => (
+              {ageSummary.map((row, idx) => (
                 <tr
                   key={row.Department}
                   style={{
@@ -1221,7 +1245,7 @@ const handleReassignAppeals = async () => {
         </h3>
         <ResponsiveContainer width="100%" height={255}>
           <BarChart
-            data={SAMPLE_GNB_SUMMARY.filter(
+            data={ageSummary.filter(
               (row) => row.Department !== "Total"
             )}
             margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
@@ -1381,7 +1405,7 @@ const handleReassignAppeals = async () => {
 <button
   onClick={() => {setShowAssignModal(true)
     setAssignTo([]);
-
+    fetchAgents();
   }}
   disabled={
     selectedRows.filter((r) => String(r["OWNER_HELPER"] || "").trim().toUpperCase() !== "ASSIGNED").length === 0
