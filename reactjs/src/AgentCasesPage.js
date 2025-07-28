@@ -46,6 +46,8 @@ const [isFetchingAll, setIsFetchingAll] = useState(true);
 const [isFetchAllMode, setIsFetchAllMode] = useState(false);
 const [paginatedRows, setPaginatedRows] = useState([]);
 const totalPages = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
+const [showTMinusModal, setShowTMinusModal] = useState(false);
+const [criticalSRs, setCriticalSRs] = useState([]);
 // ─── Auto-fetch Excel once ───────────────────────────────────────────────
 useEffect(() => {
   const autoLoadFlag = localStorage.getItem('autoLoadAgent');
@@ -230,7 +232,33 @@ const handleRefresh = async () => {
          setPageSize(10); 
 };
 
+useEffect(() => {
 
+  console.log(caseTblAllAgent.length + " cases loaded");
+  if (statusFilter === "Pended" && caseTblAllAgent.length > 0) {
+    const critical = caseTblAllAgent.filter(row => {
+      const minutes = getMinutesFromTMinus(row.t_Minus);
+      return minutes <= 240;
+    });
+
+    if (critical.length > 0 && critical.length === caseTblAllAgent.length) {
+      setCriticalSRs(critical.map(row => row.sr || row.SR || row.SR_Number)); // adjust based on your column name
+      setShowTMinusModal(true);
+    } else {
+      setCriticalSRs([]);
+      setShowTMinusModal(false);
+    }
+  } else {
+    setCriticalSRs([]);
+    setShowTMinusModal(false);
+  }
+}, [caseTblAllAgent, statusFilter]);
+
+const getMinutesFromTMinus = (tMinusStr) => {
+  if (!tMinusStr || typeof tMinusStr !== 'string') return Infinity;
+  const [hours, minutes] = tMinusStr.split(':').map(Number);
+  return (hours * 60) + minutes;
+};
 // useEffect(() => {
 //   if (!Array.isArray(caseTblAllAgent) || caseTblAllAgent.length === 0 || !pageSize) return;
 
@@ -344,24 +372,29 @@ const preserviceColumnMap = {
   'OwnerName': 'Owner' // ← most likely this is the correct field
 };
     
-  const caseTblAllColumnMap = {
-    id: "Id",
-    age_Cal: "Age (Days)",
-    sr: "SR",
-    manager: "Manager",
-    agE_PROMISE: "Promise",
-    promise_Date: "Promise Date",
-    recd_By_Cigna: 'Rec\'d',
-    system: "System",
-    lpi: "LPI",
-    pg: "PG",
-    pG_NAME: "PG Name",
-    ownerID: "Owner ID",
-    ownerName: "Owner Name",
-    appealStatus: "Status"
-  
-    //id: "Case ID", // optional: hidden from UI if not needed
-  };
+let caseTblAllColumnMap = {
+  id: "Id",
+  age_Cal: "Age (Days)",
+  sr: "SR",
+  manager: "Manager",
+  agE_PROMISE: "Promise",
+  promise_Date: "Promise Date",
+  recd_By_Cigna: "Rec'd",
+  system: "System",
+  lpi: "LPI",
+  pg: "PG",
+  pG_NAME: "PG Name",
+  ownerID: "Owner ID",
+  ownerName: "Owner Name",
+  appealStatus: "Status",
+  case_assignment_status: "Case Assignment Status",
+};
+
+// 🟦 Append `T-Minus` column if filter is "Pended"
+if (statusFilter === "Pended") {
+  caseTblAllColumnMap.t_Minus = "T-Minus(HH:MM)";
+}
+
 
   const viewAllDisplayMap = {
       id: "Case ID",
@@ -1171,12 +1204,29 @@ const ownedRows = preserviceRows.filter(
 
           {/* Data columns */}
           {Object.keys(caseTblAllColumnMap).map((excelKey) => (
-            <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
-              {preserviceDateFields.includes(excelKey)
-                ? formatExcelDate(row[excelKey])
-                : row[excelKey] ?? ''}
-            </td>
-          ))}
+          <td
+            key={excelKey}
+            style={{
+              padding: '8px',
+              border: '1px solid #eee',
+              color:
+                (excelKey === 'appealStatus' || excelKey === 't_Minus') &&
+                row.appealStatus === 'Pended'
+                  ? 'red'
+                  : 'inherit',
+              fontWeight:
+                (excelKey === 'appealStatus' || excelKey === 't_Minus') &&
+                row.appealStatus === 'Pended'
+                  ? 'bold'
+                  : 'normal',
+            }}
+          >
+            {preserviceDateFields.includes(excelKey)
+              ? formatExcelDate(row[excelKey])
+              : row[excelKey] ?? ''}
+          </td>
+        ))}
+
 
           {/* Actions */}
           <td style={{ padding: '8px', border: '1px solid #eee' }}>
@@ -1457,6 +1507,66 @@ const ownedRows = preserviceRows.filter(
     </div>
   </div>
 )}
+{showTMinusModal && (
+  <div
+    className="modal-overlay"
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+    }}
+  >
+    <div
+      className="modal"
+      style={{
+        background: "#fff",
+        borderRadius: "8px",
+        padding: "20px",
+        maxWidth: "500px",
+        width: "90%",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        position: "relative",
+      }}
+    >
+      <button
+        onClick={() => setShowTMinusModal(false)}
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "15px",
+          background: "none",
+          border: "none",
+          fontSize: "18px",
+          color: "red",
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+        aria-label="Close Modal"
+      >
+        ×
+      </button>
+      <h2 style={{ color: "#d9534f", marginBottom: "10px" }}>
+        ⚠️ All cases are within 4 hours of T-Minus!
+      </h2>
+      <p style={{ marginBottom: "10px" }}>
+        The following SRs are critically close to their 48-hour threshold:
+      </p>
+      <ul style={{ maxHeight: "200px", overflowY: "auto", paddingLeft: "20px" }}>
+        {criticalSRs.map((sr, idx) => (
+          <li key={idx} style={{ marginBottom: "4px" }}>{sr}</li>
+        ))}
+      </ul>
+    </div>
+  </div>
+)}
+
 
 
 {showCompletedModal && (

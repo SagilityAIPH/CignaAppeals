@@ -4,8 +4,9 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, LabelList, ComposedChart, Line, Legend,
 } from "recharts";
+import axios from "axios";
 import { useLocation } from "react-router-dom";
-
+import { dataApiUrl } from './config';
 function ClientProclaimPage() {
     const [excelData, setExcelData] = useState([]);
     const [directorStats, setDirectorStats] = useState({});
@@ -35,7 +36,7 @@ function ClientProclaimPage() {
     const [impactStatusFilter, setImpactStatusFilter] = useState('All'); // 'All', 'Failed', 'Open'
     const [rawImpactData, setRawImpactData] = useState([]);
     const [latestProclaimDate, setLatestProclaimDate] = useState('');
-const [latestProclaimCounts, setLatestProclaimCounts] = useState({});
+//const [latestProclaimCounts, setLatestProclaimCounts] = useState({});
 const [trendView, setTrendView] = useState('Daily');
 const [pgYesRows, setPgYesRows] = useState([]);
 const [selectedPgGsp, setSelectedPgGsp] = useState('All');
@@ -45,6 +46,57 @@ const [selectedPendedGsp, setSelectedPendedGsp] = useState('All');
 
 const [pendedSort, setPendedSort] = useState({ key: 'Total', direction: 'desc' });
 const [memberProviderSummary, setMemberProviderSummary] = useState([]);
+const [summaryData, setSummaryData] = useState([]);
+
+
+const [latestProclaimCounts, setLatestProclaimCounts] = useState({
+  Sagility: 0,
+  Concentrix: 0,
+  Wipro: 0,
+});
+
+
+
+const fetchProclaimSummary = async () => {
+  try {
+    const response = await axios.get(`${dataApiUrl}get_proclaim_summary`);
+    const data = response.data;
+
+    setSummaryData(data);
+
+    // Group by latest upload_date
+    const latestDate = data.reduce((latest, row) => {
+      const currentDate = new Date(row.upload_Date);
+      return currentDate > latest ? currentDate : latest;
+    }, new Date(0));
+
+    // Filter rows that match the latest date
+    const latestRows = data.filter(row =>
+      new Date(row.upload_Date).toISOString().split('T')[0] === latestDate.toISOString().split('T')[0]
+    );
+
+    // Aggregate total_Proclaim_Records per account
+    const counts = latestRows.reduce((acc, row) => {
+      const account = row.account?.trim();
+      if (account === "Sagility" || account === "Concentrix" || account === "Wipro") {
+        acc[account] = (acc[account] || 0) + row.total_Proclaim_Records;
+      }
+      return acc;
+    }, {});
+
+    setLatestProclaimCounts({
+      Sagility: counts.Sagility || 0,
+      Concentrix: counts.Concentrix || 0,
+      Wipro: counts.Wipro || 0,
+    });
+
+  } catch (err) {
+    console.error("Error fetching summary:", err);
+  }
+};
+
+
+
 
 const handlePendedSort = (key) => {
   setPendedSort((prev) => ({
@@ -230,7 +282,7 @@ json.forEach(row => {
 const trendData         = Object.values(trendMap).sort((a, b) => new Date(a.date) - new Date(b.date));
 const proclaimLatestDate = trendData.length ? trendData[trendData.length - 1].date : null;
 
-const latestDateCounts = proclaimLatestDate
+const latestDateCounts2 = proclaimLatestDate
   ? json.filter(row =>
       (row['Claim System'] || '').trim().toLowerCase() === 'proclaim' &&
       (row['Department']   || '').toLowerCase().includes('appeal') &&
@@ -243,10 +295,20 @@ const latestDateCounts = proclaimLatestDate
     }, {})
   : {};
 
+
+
+  const latestProclaimCounts = summaryData.reduce((acc, row) => {
+    if (row.account === "Sagility") acc.Sagility = row.total_Proclaim_Records;
+    else if (row.account === "Concentrix") acc.Concentrix = row.total_Proclaim_Records;
+    return acc;
+  }, { Sagility: 0, Concentrix: 0 });
+  
+
+
 setProclaimSummary(proclaimAppeals);
 setProclaimTrend(trendData);
 setLatestProclaimDate(proclaimLatestDate);
-setLatestProclaimCounts(latestDateCounts);
+setLatestProclaimCounts(latestProclaimCounts);
 
 
   // ✅ IMPACT
@@ -365,7 +427,7 @@ setLatestProclaimCounts(latestDateCounts);
 
 const handleAutoUpload = () => {
   setIsLoading(true);
-  const fileUrl = process.env.PUBLIC_URL + '/Appeals_Sample.xlsx'; 
+  const fileUrl = process.env.PUBLIC_URL + "/template/Appeals_Sample.xlsx"; 
   fetch(fileUrl)
     .then(response => {
       if (!response.ok) throw new Error("File not found");
@@ -385,7 +447,7 @@ const handleAutoUpload = () => {
 
 useEffect(() => {
   const shouldAutoLoad = localStorage.getItem("autoLoadProclaim");
-
+  fetchProclaimSummary();
   if (shouldAutoLoad === "true") {
     handleAutoUpload();                      // Trigger upload
     localStorage.removeItem("autoLoadProclaim"); // Clear the flag so it doesn't repeat
@@ -537,7 +599,8 @@ const transformedTrend = useMemo(() => {
         Open: 0,
         Pended: 0,
         Completed: 0,
-        Unassigned: 0
+        Unassigned: 0,
+        FFup_Sent: 0,
       };
     }
 
@@ -913,11 +976,11 @@ const sortIcon = (col) => {
         Total Proclaim Appeals as of {new Date().toLocaleDateString()}
       </div>
       <div style={{ fontSize: '14px', fontWeight: '500', color: '#003b70' }}>
-        Total Appeals:&nbsp;
-        {((latestProclaimCounts.Sagility || 0) + (latestProclaimCounts.Concentrix || 0) + (latestProclaimCounts.Wipro || 0))}
-        &nbsp;|&nbsp; Sagility: {latestProclaimCounts.Sagility || 0}
-        &nbsp;|&nbsp; Concentrix: {latestProclaimCounts.Concentrix || 0}
-        &nbsp;|&nbsp; Wipro: {latestProclaimCounts.Wipro || 0}
+      Total Appeals:&nbsp;
+      {(latestProclaimCounts.Sagility || 0) + (latestProclaimCounts.Concentrix || 0)}
+      &nbsp;|&nbsp; Sagility: {latestProclaimCounts.Sagility}
+      &nbsp;|&nbsp; Concentrix: {latestProclaimCounts.Concentrix}
+   
       </div>
     </div>
 
@@ -2025,149 +2088,6 @@ const sortIcon = (col) => {
     </div>
   </div>
 )}
-
-
-
-
-Impact section
-{impactSummary.length > 0 && (
-  <div style={{
-    marginTop: '20px',
-    marginLeft: '-30px',
-    backgroundColor: '#F5F6FA',
-    borderRadius: '10px',
-    padding: '20px',
-    
-    fontFamily: 'Lexend, sans-serif',
-  }}>
-    <h3 style={{
-      fontSize: '19px',
-      fontWeight: '500',
-      color: '#003b70',
-      marginBottom: '16px',
-      marginTop: '0px'
-    }}>
-      Impact Summary
-    </h3>
-
-
-<div style={{ marginBottom: '12px' }}>
-  <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
-    Filter by Case Status:
-  </label>
-  <select
-    value={impactStatusFilter}
-    onChange={(e) => {
-      const status = e.target.value;
-      setImpactStatusFilter(status);
-      setImpactSummary(generateImpactSummary(rawImpactData, status));
-    }}
-    style={{
-      padding: '8px 12px',
-      borderRadius: '6px',
-      border: '1px solid #ccc',
-      fontSize: '14px',
-      width: '150px',
-      fontFamily: 'inherit',
-      color: '#003b70',
-      backgroundColor: '#fff',
-    }}
-  >
-    {['All', 'Open', 'Failed'].map((opt) => (
-      <option key={opt} value={opt}>{opt}</option>
-    ))}
-  </select>
-</div>
-
-
-    <div style={{ overflowX: 'auto', border: '1px solid #ddd' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-        <thead style={{ backgroundColor: '#009fe3', color: 'white' }}>
-          <tr>
-            {['Department', '0-15 days', '16-30 days', '31-60 days', '61+ days', 'Total'].map(header => (
-              <th key={header} style={{ padding: '10px', border: '1px solid #ccc', textAlign: 'left' }}>
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {impactSummary.map((row, idx) => (
-            <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f3f6fb' }}>
-              <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: row.Department === 'Total' ? '600' : '400' }}>
-                {row.Department}
-              </td>
-              {['0-15 days', '16-30 days', '31-60 days', '61+ days', 'Total'].map(bucket => (
-                <td key={bucket} style={{ padding: '8px', border: '1px solid #eee', textAlign: 'left' }}>
-                  {row[bucket] > 0 ? row[bucket] : '-'}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-
-    {impactSummary.length > 0 && (
-  <div style={{
-    marginTop: '20px',
-    marginLeft: '00px',
-    backgroundColor: 'White',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)',
-    fontFamily: 'Lexend, sans-serif',
-  }}>
-    <h3 style={{
-      fontSize: '18px',
-      fontWeight: '500',
-      color: '#003b70',
-      marginBottom: '24px',
-      borderBottom: '1px solid #ddd',
-      paddingBottom: '8px',
-      marginTop: '0px'
-    }}>
-      Appeal Age Bucket Breakdown per GSP
-    </h3>
-
-    <ResponsiveContainer width="100%" height={200}>
-      <BarChart
-        data={impactSummary.filter(row => row.Department !== 'Total')}
-        margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="Department" tick={{ fontSize: 12 }} />
-        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-        <Tooltip />
-        <Legend wrapperStyle={{ fontSize: '12px' }} />
-        
-        <Bar dataKey="0-15 days" fill="#00C49F">
-          <LabelList dataKey="0-15 days" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-        </Bar>
-        <Bar dataKey="16-30 days" fill="#0071CE">
-          <LabelList dataKey="16-30 days" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-        </Bar>
-        <Bar dataKey="31-60 days" fill="#FFA726">
-          <LabelList dataKey="31-60 days" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-        </Bar>
-        <Bar dataKey="61+ days" fill="#EF5350">
-          <LabelList dataKey="61+ days" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-)}
-
-  </div>
-)}
-
-
-
-
-
-
-
-
 
 
     </div>

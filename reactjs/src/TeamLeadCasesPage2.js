@@ -468,25 +468,29 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
   };
 
 
-  
-  const caseTblAllColumnMap = {
-    id: "Id",
-    age_Cal: "Age (Days)",
-    sr: "SR",
-    manager: "Manager",
-    agE_PROMISE: "Promise",
-    promise_Date: "Promise Date",
-    recd_By_Cigna: 'Rec\'d',
-    system: "System",
-    lpi: "LPI",
-    pg: "PG",
-    pG_NAME: "PG Name",
-    ownerID: "Owner ID",
-    ownerName: "Owner Name",
-    appealStatus: "Status",
-    case_Assignment_Status: "Case Assignment",
-    //id: "Case ID", // optional: hidden from UI if not needed
-  };
+    
+let caseTblAllColumnMap = {
+  id: "Id",
+  age_Cal: "Age (Days)",
+  sr: "SR",
+  manager: "Manager",
+  agE_PROMISE: "Promise",
+  promise_Date: "Promise Date",
+  recd_By_Cigna: "Rec'd",
+  system: "System",
+  lpi: "LPI",
+  pg: "PG",
+  pG_NAME: "PG Name",
+  ownerID: "Owner ID",
+  ownerName: "Owner Name",
+  appealStatus: "Status",
+  case_assignment_status: "Case Assignment Status",
+};
+
+// 🟦 Append `T-Minus` column if filter is "Pended"
+if (caseStatusFilter === "Pended") {
+  caseTblAllColumnMap.t_Minus = "T-Minus(HH:MM)";
+}
 
   
   const viewAllDisplayMap = {
@@ -1473,12 +1477,26 @@ const fetchCaseDetailsById = async (id) => {
 
           {/* ✅ Dynamic data columns */}
           {Object.entries(caseTblAllColumnMap).map(([key]) => (
-            <td key={key} style={{ padding: "8px", border: "1px solid #eee" }}>
+              <td
+              key={key}
+              style={{
+                padding: '8px',
+                border: '1px solid #eee',
+                color:
+                  (key === 'appealStatus' || key === 't_Minus') &&
+                  row.appealStatus === 'Pended'
+                    ? 'red'
+                    : 'inherit',
+                fontWeight:
+                  (key === 'appealStatus' || key === 't_Minus') &&
+                  row.appealStatus === 'Pended'
+                    ? 'bold'
+                    : 'normal',
+              }}
+            >
               {preserviceDateFields.includes(key)
                 ? formatExcelDate(row[key])
-                : typeof row[key] === "object" && row[key] !== null
-                ? JSON.stringify(row[key])
-                : row[key] ?? ""}
+                : row[key] ?? ''}
             </td>
           ))}
 

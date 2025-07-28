@@ -64,7 +64,7 @@ function ClientImpactPage() {
 
   const handleAutoUpload = () => {
     setIsLoading(true);
-    fetch(process.env.PUBLIC_URL + "/Appeals_Sample.xlsx")
+    fetch(process.env.PUBLIC_URL + "/template/Appeals_Sample.xlsx")
       .then(r=>{ if(!r.ok) throw new Error("file"); return r.arrayBuffer(); })
       .then(buf=>{
         const wb = XLSX.read(new Uint8Array(buf), { type:"array" });

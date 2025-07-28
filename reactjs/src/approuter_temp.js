@@ -18,7 +18,7 @@ import ImpactPage from './ClientImpactPage';
 
 function AppRouter() {
   return (
-    <Router basename='/CignaAppeals'>
+    <Router basename='/pages/cigna_appeals'>
       <Routes>
         <Route path="/" element={<LoginPage />} />
 

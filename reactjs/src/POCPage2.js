@@ -173,24 +173,28 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   };
 
   
-  const caseTblAllColumnMap = {
-    id: "Id",
-    age_Cal: "Age (Days)",
-    sr: "SR",
-    manager: "Manager",
-    agE_PROMISE: "Promise",
-    promise_Date: "Promise Date",
-    recd_By_Cigna: 'Rec\'d',
-    system: "System",
-    lpi: "LPI",
-    pg: "PG",
-    pG_NAME: "PG Name",
-    ownerID: "Owner ID",
-    ownerName: "Owner Name",
-    appealStatus: "Status",
-    case_assignment_status: "Case Assignment",
-    //id: "Case ID", // optional: hidden from UI if not needed
-  };
+let caseTblAllColumnMap = {
+  id: "Id",
+  age_Cal: "Age (Days)",
+  sr: "SR",
+  manager: "Manager",
+  agE_PROMISE: "Promise",
+  promise_Date: "Promise Date",
+  recd_By_Cigna: "Rec'd",
+  system: "System",
+  lpi: "LPI",
+  pg: "PG",
+  pG_NAME: "PG Name",
+  ownerID: "Owner ID",
+  ownerName: "Owner Name",
+  appealStatus: "Status",
+  case_assignment_status: "Case Assignment Status",
+};
+
+// 🟦 Append `T-Minus` column if filter is "Pended"
+if (caseStatusFilter === "Pended") {
+  caseTblAllColumnMap.t_Minus = "T-Minus(HH:MM)";
+}
 
   
   const viewAllDisplayMap = {
@@ -504,6 +508,23 @@ const handleRefresh = async () => {
          setPageSize(10); 
 };
 
+
+const handleAutoEmail = async () => {
+  try {
+    const response = await axios.post(`${dataApiEmailUrl}AutoSendAppealsEmail`);
+
+
+
+    if (response.status === 200) {
+      alert("✅ Appeals emails were sent successfully.");
+    } else {
+      alert("⚠️ Something went wrong. Please try again.");
+    }
+  } catch (error) {
+    console.error("Error sending auto emails:", error);
+    alert("❌ Failed to send appeals emails. Check the console for details.");
+  }
+};
 
 
 // useEffect(() => {
@@ -1067,7 +1088,7 @@ const handleReassignAppeals = async () => {
         
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-         
+          <button onClick={handleAutoEmail} style={{ backgroundColor: "#00aaff", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Auto email</button>
           <button onClick={handleRefresh} style={{ backgroundColor: "#00aaff", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Refresh</button>
           <button style={{ backgroundColor: "#217346", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Extract Excel</button>
           </div>
@@ -1340,6 +1361,29 @@ const handleReassignAppeals = async () => {
         </select>
       </div>
 
+       {/* Prioritization Filter */}
+       <div style={{ width: 200 }}>
+        <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4 }}>
+          Filter by Prioritization:
+        </label>
+        <select
+          value={assignmentFilter}
+          onChange={(e) => setAssignmentFilter(e.target.value)}
+          style={{
+            padding: 8,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            width: "100%",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="">-Select Prioritization-</option>
+          <option value="YES">OOC (NonCompliant - YES)</option>
+          <option value="Pre-Service">Pre-Service</option>
+          <option value="YES">PG - YES</option>
+        </select>
+      </div>
+
               {/*Filter rows*/}
     <div style={{ display: 'flex', flexDirection: 'column', width: '150px' }}>
     <label
@@ -1527,11 +1571,27 @@ const handleReassignAppeals = async () => {
 
           {/* Data columns */}
           {Object.keys(caseTblAllColumnMap).map((excelKey) => (
-            <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
-              {preserviceDateFields.includes(excelKey)
-                ? formatExcelDate(row[excelKey])
-                : row[excelKey] ?? ''}
-            </td>
+                <td
+                key={excelKey}
+                style={{
+                  padding: '8px',
+                  border: '1px solid #eee',
+                  color:
+                    (excelKey === 'appealStatus' || excelKey === 't_Minus') &&
+                    row.appealStatus === 'Pended'
+                      ? 'red'
+                      : 'inherit',
+                  fontWeight:
+                    (excelKey === 'appealStatus' || excelKey === 't_Minus') &&
+                    row.appealStatus === 'Pended'
+                      ? 'bold'
+                      : 'normal',
+                }}
+              >
+                {preserviceDateFields.includes(excelKey)
+                  ? formatExcelDate(row[excelKey])
+                  : row[excelKey] ?? ''}
+              </td>
           ))}
 
           {/* Actions */}

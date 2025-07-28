@@ -152,7 +152,7 @@ const [facetIFPInventory, setFacetIFPInventory] = useState([]);
   /* ▸ auto-load sample file once */
   useEffect(() => {
     setIsLoading(true);
-    fetch(process.env.PUBLIC_URL + "/Appeals_Sample.xlsx")
+    fetch(process.env.PUBLIC_URL + "/template/Appeals_Sample.xlsx")
       .then(r => { if (!r.ok) throw new Error("file"); return r.arrayBuffer(); })
       .then(buf => processWorkbook(XLSX.read(new Uint8Array(buf), { type:"array" })))
       .catch(e => { console.error(e); alert("Cannot load sample file."); setIsLoading(false); });
