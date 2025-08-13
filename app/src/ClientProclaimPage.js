@@ -5,7 +5,7 @@ import {
   CartesianGrid, Cell, LabelList, ComposedChart, Line, Legend,
 } from "recharts";
 import axios from "axios";
-import { useLocation } from "react-router-dom";
+import { data, useLocation } from "react-router-dom";
 import { dataApiUrl, testIP } from './config';
 function ClientProclaimPage() {
     const [excelData, setExcelData] = useState([]);
@@ -47,7 +47,9 @@ function ClientProclaimPage() {
     const [pendedSort, setPendedSort] = useState({ key: 'Total', direction: 'desc' });
     const [memberProviderSummary, setMemberProviderSummary] = useState([]);
     const [summaryData, setSummaryData] = useState([]);
-
+    const [memberProvider, setMemberProvider] = useState([]);
+    const [outOfComplianceView, setOutOfComplianceView] = useState("Daily");
+    const [transformComplianceTrend, setTransformComplianceTrend] = useState({});
     const [latestProclaimCounts, setLatestProclaimCounts] = useState({
       Sagility: 0,
       Concentrix: 0,
@@ -55,50 +57,350 @@ function ClientProclaimPage() {
     });
     const [trendData, setTrendData] = useState([]);
     const [viewMode, setViewMode] = useState('Daily');
+    const [pendedReason, setPendedReason] = useState([]);
+    const [transformTrend, setTransformTrend] = useState([]);
+    const [pgName, setPgNames] = useState([]);
+    const [list, setList] = useState([]);
+    const [nonAsoStats,setNonAsoStats] = useState([]);
+    const [complianceRawData, setComplianceRawData] = useState([]);
 
+const [preservicePage, setPreservicePage] = useState(1);
+const [preservicePageSize, setPreservicePageSize] = useState(20);
+const [preserviceTotal, setPreserviceTotal] = useState(0);
+const [isPreserviceLoading, setIsPreserviceLoading] = useState(false);
+const [pgNameSummary, setPgNameSummary] = useState([]);
+const [selectedPgSummaryGsp, setSelectedPgSummaryGsp] = useState('All');
+const [selectedPendReasonGsp, setSelectedPendReasonGsp] = useState('All');
+const [pgYesPage, setPgYesPage] = useState(1);
+const [pgYesPageSize, setPgYesPageSize] = useState(20);
+const [pgYesTotal, setPgYesTotal] = useState(0);
+const [isPgYesLoading, setIsPgYesLoading] = useState(false);
+const [selectedPgYesGsp, setSelectedPgYesGsp] = useState('All');
+const [selectedPreSerGsp, setSelectedPreSerGsp] = useState('All');
 
     useEffect(() => {
       const shouldAutoLoad = localStorage.getItem("autoLoadProclaim");
-      fetchProclaimSummary();
+      //fetchProclaimSummary();
       if (shouldAutoLoad === "true") {
         handleAutoUpload();                      // Trigger upload
         localStorage.removeItem("autoLoadProclaim"); // Clear the flag so it doesn't repeat
       }
-    
-       fetchDataGraph();
-       fetchNonCompliant();
+      fetchProclaimSummary();
+      fetchProclaimStatusGraph();
+       //fetchNonCompliant();
+       fetchProclaimPendReasonCt();
+       fetchMbrPrv();
+       //fetchComplianceData();
+       fetchComplianceRawData()
+       fetchPgNameSummary();
+       fetchNonAsoSummary();
+      
     }, []);
 
     const fetchNonCompliant = async () => {
       try {
         const response = await axios.get(`${dataApiUrl}get_out_of_compliance`);
         console.log(response.data || []);
+         setComplianceView(response.data);
       } catch (error) {
-        console.error("Failed to fetch agents", error);
+        console.error("Failed to fetch get_out_of_compliance", error);
       }
     };
 
-    const fetchDataGraph = async () => {
-      try {
-        const res = await axios.get(`${testIP}get_proclaim_summary`);
-        const filtered = res.data.filter(x => x.Account !== 'Total');
 
-        const mapped = filtered.map(item => ({
-          date: item.upload_Date,
-          Assigned: item.assigned_Count,
-          Open: item.open_Count,
-          Pended: item.pended_Count,
-          Completed: item.completed_Count,
+    useEffect(() => {
+      fetchProclaimPendReasonCt();
+      //fetchMbrPrv();
+    }, [selectedPendedGsp]); // Re-fetch when selectedPendedGsp changes}
+
+    useEffect(() => {
+      groupTrendData();
+    }, [trendView, trendData]);
+
+
+    const groupTrendData = () => {
+      if (trendView === 'Daily') {
+        const formatted = trendData.map(row => ({
+          ...row,
+          date: row.date.split('T')[0] // removes time
         }));
-
-        setTrendData(mapped);
-      } catch (err) {
-        console.error(err);
+        setTransformTrend(formatted);
+        return;
       }
+  
+      const groupMap = {};
+  
+      trendData.forEach(row => {
+        const date = new Date(row.date);
+        let key = '';
+  
+        if (trendView === 'Weekly') {
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay()); // Sunday start
+          key = weekStart.toISOString().split('T')[0];
+        } else if (trendView === 'Monthly') {
+          key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        }
+  
+        if (!groupMap[key]) {
+          groupMap[key] = {
+            date: key,
+            Assigned: 0,
+            Open: 0,
+            Pended: 0,
+            Completed: 0,
+            FFUp_Sent: 0
+          };
+        }
+  
+        groupMap[key].Assigned += row.Assigned || 0;
+        groupMap[key].Open += row.Open || 0;
+        groupMap[key].Pended += row.Pended || 0;
+        groupMap[key].Completed += row.Completed || 0;
+        groupMap[key].FFUp_Sent += row.FFUp_Sent || 0;
+      });
+  
+      const groupedArray = Object.values(groupMap);
+      setTransformTrend(groupedArray);
     };
+
+
+const fetchPreserviceRows = async (gsp, page, size) => {
+  setIsPreserviceLoading(true);
+  try {
+    const res = await axios.post(
+      `${dataApiUrl}cases_tbl_all_pre_service`,
+       {}, 
+      {
+        params: {
+          account: gsp === "All" ? "" : gsp,
+          pageNumber: page,
+          pageSize: size,
+        },
+      }
+    );
+    setPreserviceRows(res.data.data || []);
+    setPreserviceTotal(res.data.totalRecords || 0);
+  } catch (err) {
+    setPreserviceRows([]);
+    setPreserviceTotal(0);
+    console.error("Failed to fetch Pre-Service Appeals:", err);
+  }
+  setIsPreserviceLoading(false);
+};
+
+
+const fetchPgYesRows = async (gsp, page, size) => {
+  setIsPgYesLoading(true);
+  try {
+    const res = await axios.post(
+      `${dataApiUrl}cases_tbl_all_pg_yes`,
+      {}, // POST body is empty, params go in config
+      {
+        params: {
+          account: gsp === "All" ? "" : gsp,
+          pageNumber: page,
+          pageSize: size,
+        },
+      }
+    );
+    setPgYesRows(res.data.data || []);
+    setPgYesTotal(res.data.totalRecords || 0);
+  } catch (err) {
+    setPgYesRows([]);
+    setPgYesTotal(0);
+    console.error("Failed to fetch PG YES Appeals:", err);
+  }
+  setIsPgYesLoading(false);
+};
+
+
+function fetchComplianceRawData(){
+  // Fetch only once
+  axios.get(`${dataApiUrl}get_proclaim_out_of_compliance_ct`, {
+    params: { account: 'Onshore' }
+  }).then(res => setComplianceRawData(res.data))
+    .catch(err => console.error("Error fetching compliance data:", err));
+}
+
+  const fetchNonAsoStats2 = async () => {
+    try {
+      const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
+        params: { director: selectedDirector === 'All' ? '' : selectedDirector }
+      });
+      setNonAsoStats(res.data || []);
+      // Set director options dynamically
+      const dirs = Array.from(new Set((res.data || []).map(row => row.director).filter(Boolean)));
+      setDirectorOptions(['All', ...dirs]);
+    } catch (err) {
+      setNonAsoStats([]);
+      setDirectorOptions(['All']);
+      console.error('Error fetching Non-ASO stats:', err);
+    }
+  };
+useEffect(() => {
+
+  fetchNonAsoStats();
+}, [selectedDirector]);
+
+// Dynamic regions and roles from API
+const regions = useMemo(
+  () => Array.from(new Set(nonAsoStats.map(row => row.region))).sort(),
+  [nonAsoStats]
+);
+const roles = useMemo(
+  () => Array.from(new Set(nonAsoStats.map(row => row.role))).sort(),
+  [nonAsoStats]
+);
+
+// Group data for charting: [{date, Admin, Med, upload_date}]
+const regionLabels = {
+  FI: 'Fully Insured',
+  NY: 'Fully Insured - New York',
+  TX: 'Fully Insured - Texas',
+  ASO: 'ASO',
+};
+
+const groupedNonAso = useMemo(() => {
+  // Group by region, then by upload_date (or date if you have it)
+  const grouped = {};
+  nonAsoStats.forEach(row => {
+    const { region, role, record_Count, upload_date } = row;
+    if (!grouped[region]) grouped[region] = {};
+    const dateKey = upload_date ? upload_date.split('T')[0] : 'Unknown';
+    if (!grouped[region][dateKey]) grouped[region][dateKey] = { date: dateKey };
+    grouped[region][dateKey][role] = record_Count;
+  });
+  // Convert to array for recharts
+  const result = {};
+  Object.keys(grouped).forEach(region => {
+    result[region] = Object.values(grouped[region]);
+  });
+  return result;
+}, [nonAsoStats]);
+
+
+
+useEffect(() => {
+  fetchPreserviceRows(selectedPreSerGsp, preservicePage, preservicePageSize);
+}, [selectedPreSerGsp, preservicePage, preservicePageSize]);
+
+useEffect(() => {
+  fetchPgYesRows(selectedPgYesGsp, pgYesPage, pgYesPageSize);
+}, [selectedPgYesGsp, pgYesPage, pgYesPageSize]);
+
+function fetchGroupComplianceRawData(){
+   // Only regroup when view changes
+  const groupedData = {};
+  complianceRawData.forEach(item => {
+    const date = new Date(item.upload_date);
+    let groupKey = "";
+
+    if (outOfComplianceView === "Weekly") {
+      const weekStart = new Date(date);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      groupKey = weekStart.toISOString().split("T")[0];
+    } else if (outOfComplianceView === "Monthly") {
+      groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    } else {
+      groupKey = date.toISOString().split("T")[0];
+    }
+
+    if (!groupedData[item.account]) groupedData[item.account] = {};
+    if (!groupedData[item.account][groupKey]) {
+      groupedData[item.account][groupKey] = { date: groupKey, YES: 0, NO: 0 };
+    }
+
+    groupedData[item.account][groupKey].YES += item.nonCompliant2_Yes || 0;
+    groupedData[item.account][groupKey].NO += item.nonCompliant2_No || 0;
+  });
+
+  const transformed = {};
+  for (const account in groupedData) {
+    transformed[account] = Object.values(groupedData[account]);
+  }
+  setTransformComplianceTrend(transformed);
+}
+  
+useEffect(() => {
+ fetchGroupComplianceRawData();
+}, [outOfComplianceView, complianceRawData]);
+
+    useEffect(() => {
+
+  fetchNonAsoStats();
+  }, [selectedDirector]);
+
+  const fetchNonAsoStats = async () => {
+    try {
+      const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
+        params: { director: selectedDirector === 'All' ? 'Sagility' : selectedDirector }
+      });
+      setNonAsoStats(res.data || []);
+    } catch (err) {
+      setNonAsoStats([]);
+      console.error('Error fetching Non-ASO stats:', err);
+    }
+  };
+  
+    
+
+    const fetchProclaimStatusGraph = async () => {
+        try {
+          const res = await axios.get(`${dataApiUrl}get_proclaim_status_ct`);
+          const filtered = res.data.filter(x => x.Account !== 'Total');
+          const mapped = filtered.map(item => ({
+            date: new Date(item.upload_Date).toLocaleDateString('en-CA'),
+            Assigned: item.assigned_Count,
+            Open: item.open_Count,
+            Pended: item.pended_Count,
+            Completed: item.completed_Count,
+            FFup_Sent: item.ffUp_Sent || 0
+          }));
+          setTrendData(mapped);
+        } catch (err) {
+          console.error(err);
+        }
+      };
+    
+    
+   useEffect(() => {
+  
+  fetchPgNameSummary();
+}, [selectedPgSummaryGsp]);
+
+const fetchPgNameSummary = async () => {
+    try {
+      // Use selectedPgSummaryGsp or default to 'All'
+      const account = selectedPgSummaryGsp === 'All' ? '' : selectedPgSummaryGsp;
+      const res = await axios.get(`${dataApiUrl}get_proclaim_pg_names_ct`, {
+        params: { account }
+      });
+      setPgNameSummary(res.data || []);
+    } catch (error) {
+      setPgNameSummary([]);
+      console.error("Error fetching PG name summary:", error);
+    }
+  };
+
+
+      const fetchNonAsoSummary = async () => {
+        try {
+          const gsp = 'Onshore';
+          const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
+            params: { direcotr: gsp }
+          });
+         
+        } catch (error) {
+          console.error("Error fetching PG name summary:", error);
+         
+        } 
+      };
+      
+
     const fetchProclaimSummary = async () => {
       try {
-        const response = await axios.get(`${testIP}get_proclaim_summary`);
+        const response = await axios.get(`${dataApiUrl}get_proclaim_summary`);
         const data = response.data;
     
         setSummaryData(data);
@@ -136,9 +438,50 @@ function ClientProclaimPage() {
     
 
 
+    
+     const fetchProclaimPendReasonCt = async () => {
+
+      const account = 'Sagility';
+
+      try {
+        const response = await axios.get(`${dataApiUrl}get_proclaim_pend_reason_ct`, {
+          params: { selectedPendedGsp }
+        });
+
+        setPendedReason(response.data);
+        
+      } catch (error) {
+        console.error('Error fetching pend reason data:', error);
+        throw error;
+      }
+    };
+    
 
 
-
+    const fetchMbrPrv = async () => {
+      try {
+        const selectedPendedGsp = selectedGsp === "All" ? "" : selectedGsp;
+      
+        const response = await axios.get(`${dataApiUrl}get_proclaim_mbr_prov_ct`, {
+          params:  { account: selectedPendedGsp }  
+        });
+      
+        const data = response.data;
+  
+        // Format: rename properties to match BarChart keys
+        const formatted = data.map(row => ({
+          Department: row.account,
+          Member: row.member_Count || 0,
+          Provider: row.provider_Count || 0
+        }));
+  
+        setMemberProvider(formatted);
+      } catch (err) {
+        console.error("Failed to fetch member/provider summary:", err);
+        setMemberProvider([]); // fallback to empty
+      }
+    };
+  
 
 
 const handlePendedSort = (key) => {
@@ -316,7 +659,23 @@ json.forEach(row => {
 // -------------------------------------------------------------------------------
 
 
+const fetchPgNameSummary = async () => {
+  const gsp = "Sagility";
 
+  try {
+    const { data } = await axios.get(`${dataApiUrl}get_proclaim_pg_names_ct`, {
+      params: { account: gsp },
+    });
+
+    // You can handle `data` here
+    console.log("PG name summary:", data);
+
+    return data; // returning makes it reusable
+  } catch (error) {
+    console.error("Error fetching PG name summary:", error.message || error);
+    return null; // handle gracefully for caller
+  }
+};
 
 
 
@@ -496,7 +855,39 @@ const handleAutoUpload = () => {
       : pgYesRows.filter(row => (row['Director'] || '').trim() === selectedPgGsp)
   ), [selectedPgGsp, pgYesRows]);
 
-  const marqueeMessages = useMemo(() => [
+  const marqueeMessages = useMemo(() => {
+  // Helper to get counts for each account
+  const getAccount = (name) =>
+    summaryData.find(row => (row.account || '').toLowerCase() === name.toLowerCase()) || {};
+
+  const sg = getAccount('Sagility');
+  const wi = getAccount('Wipro');
+  const cnx = getAccount('Concentrix');
+  const onshore = getAccount('Onshore');
+
+  // Totals
+  const assignedTotal =
+    (sg.assigned_Count || 0) +
+    (wi.assigned_Count || 0) +
+    (cnx.assigned_Count || 0) +
+    (onshore.assigned_Count || 0);
+
+  const completedTotal =
+    (sg.completed_Count || 0) +
+    (wi.completed_Count || 0) +
+    (cnx.completed_Count || 0) +
+    (onshore.completed_Count || 0);
+
+  const untouchedTotal =
+    (sg.unassigned_Count || 0) +
+    (wi.unassigned_Count || 0) +
+    (cnx.unassigned_Count || 0) +
+    (onshore.unassigned_Count || 0);
+
+  // Percentages (avoid division by zero)
+  const percent = (num, denom) => denom ? ((num / denom) * 100).toFixed(1) : '0.0';
+
+  return [
     `🚀 Welcome to the Proclaim Dashboard`,
     ` `,
 
@@ -507,27 +898,28 @@ const handleAutoUpload = () => {
     })}  12:00`,
     ` `,
 
-    `🔢 Assigned : XXX  Completed:XX   Untouched: XX`,
-    `📊 Assigned: %  Completed: %   Untouched: %`,
+    `🔢 Assigned : ${assignedTotal}  Completed: ${completedTotal}   Untouched: ${untouchedTotal}`,
+    `📊 Assigned: ${percent(assignedTotal, assignedTotal + untouchedTotal)}%  Completed: ${percent(completedTotal, assignedTotal + untouchedTotal)}%   Untouched: ${percent(untouchedTotal, assignedTotal + untouchedTotal)}%`,
 
-    `🔢 SG: Assigned: XX 📊 Completed: XX - %`,
+    `🔢 SG: Assigned: ${sg.assigned_Count || 0} 📊 Completed: ${sg.completed_Count || 0} - ${percent(sg.completed_Count || 0, (sg.assigned_Count || 0) + (sg.unassigned_Count || 0))}%`,
     ` `,
 
-    `🔢 Wi: Assigned: XX 📊 Completed: XX - %`,
+    `🔢 Wi: Assigned: ${wi.assigned_Count || 0} 📊 Completed: ${wi.completed_Count || 0} - ${percent(wi.completed_Count || 0, (wi.assigned_Count || 0) + (wi.unassigned_Count || 0))}%`,
     ` `,
 
-    `🔢 CNX: Assigned: XX 📊 Completed: XX - %`,
+    `🔢 CNX: Assigned: ${cnx.assigned_Count || 0} 📊 Completed: ${cnx.completed_Count || 0} - ${percent(cnx.completed_Count || 0, (cnx.assigned_Count || 0) + (cnx.unassigned_Count || 0))}%`,
     ` `,
 
-    `🔢 Gold: Proclaim: XX % 📊 FAcets: XX - %`,
-    `🔢 BRZ: Proclaim: XX % 📊 FAcets: XX - %`,
+    `🔢 Onshore: Assigned: ${onshore.assigned_Count || 0} 📊 Completed: ${onshore.completed_Count || 0} - ${percent(onshore.completed_Count || 0, (onshore.assigned_Count || 0) + (onshore.unassigned_Count || 0))}%`,
+    ` `,
 
-    `📊 Total Pre-Service Appeals: ${filteredPreserviceRows.length}`,
-    `📊 Total PG Appeals: ${filteredPgYesRows.length}`,
+    `📊 Total Pre-Service Appeals: ${preserviceTotal}`,
+    `📊 Total PG Appeals: ${pgYesTotal}`,
 
     `✅ Impact Summary Ready: ${impactSummary.length - 1} departments`,
     `📅 Last Upload: ${new Date().toLocaleDateString()}`
-  ], [filteredPreserviceRows, filteredPgYesRows, impactSummary]);
+  ];
+}, [summaryData, preserviceTotal, pgYesTotal, impactSummary]);
 
 
   const messagesPerSlide = 2; // 👈 Put this just above useEffect
@@ -546,7 +938,7 @@ const handleAutoUpload = () => {
       "AGE", "SR.", "Manager", "PROMISE", "Task Promise Date", "Rec'd",
       "System", "LPI?", "PG?", "PG Name", "OwnerID", "Owner"
     ];
-    const preserviceColumnMap = {
+    const preserviceColumnMap2 = {
     "Age Cal": "AGE",
     "SR .": "SR.",
     "Manager": "Manager",
@@ -560,6 +952,30 @@ const handleAutoUpload = () => {
     "OwnerID": "OwnerID",
     "OwnerName": "Owner"
     };
+
+
+
+let preserviceColumnMap = {
+  
+  sr: "SR",
+  age_Cal: "Age (Days)",
+  manager: "Manager",
+  agE_PROMISE: "Promise",
+  promise_Date: "Promise Date",
+  recd_By_Cigna: "Rec'd",
+  system: "System",
+  lpi: "LPI",
+  pg: "PG",
+  nonCompliant2: "Non-Compliant 2", 
+  appeal_Category: "Appeal Category",
+  pG_NAME: "PG Name",
+  ownerID: "Owner ID",
+  //ownerName: "Owner Name",
+  //appealStatus: "Status",
+  //case_assignment_status: "Case Assignment Status",
+};
+
+
     const preserviceDateFields = ["Promise Date", "Recd By Cigna"];
     const formatExcelDate = (value) => {
       if (typeof value === 'number') {
@@ -611,7 +1027,7 @@ const handleAutoUpload = () => {
   };
 
 
-const transformedTrend = useMemo(() => {
+let transformedTrend = useMemo(() => {
   if (viewMode === 'Daily') {
     return trendData.map(item => ({
       ...item,
@@ -639,7 +1055,8 @@ const transformedTrend = useMemo(() => {
         Assigned: 0,
         Open: 0,
         Pended: 0,
-        Completed: 0
+        Completed: 0,
+        FFup_Sent: 0
       };
     }
 
@@ -647,6 +1064,7 @@ const transformedTrend = useMemo(() => {
     groupMap[key].Open += item.Open || 0;
     groupMap[key].Pended += item.Pended || 0;
     groupMap[key].Completed += item.Completed || 0;
+    groupMap[key].FFup_Sent += item.FFup_Sent || 0;
   });
 
   return Object.values(groupMap);
@@ -670,7 +1088,7 @@ const transformedTrend = useMemo(() => {
 };
 
 
-    const regionLabels = {
+    const regionLabels2 = {
     FI: 'Fully Insured',
     NY: 'Fully Insured - New York',
     TX: 'Fully Insured - Texas',
@@ -827,8 +1245,9 @@ useEffect(() => {
 
 
   const sortedPendedSummary = useMemo(() => {
+   
   const { key, direction } = pendedSort;
-  const sorted = [...pendedReasonSummary].sort((a, b) => {
+  const sorted = [...pendedReason].sort((a, b) => {
     const valA = isNaN(a[key]) ? a[key] : Number(a[key]);
     const valB = isNaN(b[key]) ? b[key] : Number(b[key]);
     if (valA < valB) return direction === 'asc' ? -1 : 1;
@@ -836,7 +1255,7 @@ useEffect(() => {
     return 0;
   });
   return sorted;
-}, [pendedReasonSummary, pendedSort]);
+}, [pendedReason, pendedSort]);
 
 /* --------------------------------------------------------------------- */
 
@@ -906,7 +1325,6 @@ const sortIcon = (col) => {
   return pendedSort.direction === 'asc' ? '▲' : '▼';
 };
 
- 
   return (
     <div style={{ padding: '0px', fontFamily: 'Lexend, sans-serif' }}>
       {/* <button
@@ -1023,7 +1441,7 @@ const sortIcon = (col) => {
     </div>
 
     {/* === view switch ======================================================== */}
-    <div style={{ marginBottom: '12px' }}>
+    {/* <div style={{ marginBottom: '12px' }}>
       <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>View:</label>
       <select
         value={trendView}
@@ -1039,10 +1457,62 @@ const sortIcon = (col) => {
           <option key={opt} value={opt}>{opt}</option>
         )}
       </select>
+    </div> */}
+
+
+    <div style={{
+      marginTop: '0px',
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      padding: '24px',
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
+    }}>
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>View:</label>
+        <select
+          value={trendView}
+          onChange={e => setTrendView(e.target.value)}
+          style={{
+            padding: '8px 12px', borderRadius: '6px',
+            border: '1px solid #ccc', fontSize: '14px',
+            width: '150px', fontFamily: 'inherit',
+            color: '#003b70', backgroundColor: '#fff',
+          }}
+        >
+          {['Daily', 'Weekly', 'Monthly'].map(opt =>
+            <option key={opt} value={opt}>{opt}</option>
+          )}
+        </select>
+      </div>
+
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart data={transformTrend}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+          <Tooltip />
+          <Legend wrapperStyle={{ fontSize: '12px' }} />
+          <Bar dataKey="Assigned" fill="#1E88E5">
+            <LabelList dataKey="Assigned" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="Open" fill="#00ACC1">
+            <LabelList dataKey="Open" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="Pended" fill="#FFB300">
+            <LabelList dataKey="Pended" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="Completed" fill="#66BB6A">
+            <LabelList dataKey="Completed" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+          <Bar dataKey="FFup_Sent" fill="#AB47BC">
+            <LabelList dataKey="FFup Sent" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
 
     {/* === main bar chart ===================================================== */}
-    <div style={{
+    {/* <div style={{
       marginTop: '10px',
       backgroundColor: 'white',
       borderRadius: '12px',
@@ -1062,7 +1532,7 @@ const sortIcon = (col) => {
           <Bar dataKey="Completed" fill="#66BB6A"><LabelList dataKey="Completed" position="top" style={{ fontSize: 10, fontWeight: 'bold' }}/></Bar>
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </div> */}
 
 {/* === NEW ▸ pended reason table ========================================== */}
 {pendedReasonSummary.length > 0 && (
@@ -1160,26 +1630,61 @@ const sortIcon = (col) => {
 </thead>
 
 <tbody>
-  {sortedPendedSummary.map((row, idx) => (
-    <tr key={row.Reason} style={{ backgroundColor: idx % 2 ? '#f3f6fb' : '#ffffff' }}>
-      {/* Reason */}
-      <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '600' }}>{row.Reason}</td>
+{(() => {
+    let rowRendered = false;
 
-      {/* Dynamic cells based on GSP filter */}
-      {(['All'].includes(selectedPendedGsp)
+    const rows = [...new Set(pendedReason.map(row => row.pend_reason))].map((reason, idx) => {
+      const rowsForReason = pendedReason.filter(row => row.pend_reason === reason);
+
+      const selectedAccounts = selectedPendedGsp === 'All'
         ? ['Sagility', 'Concentrix', 'Wipro']
-        : [selectedPendedGsp]
-      ).map(gsp => (
-        <React.Fragment key={gsp}>
-          <td style={{ padding: '8px', border: '1px solid #eee' }}>{row[gsp]}</td>
-          <td style={{ padding: '8px', border: '1px solid #eee' }}>{row[`${gsp}Pct`]}%</td>
-        </React.Fragment>
-      ))}
+        : [selectedPendedGsp];
 
-      {/* Total */}
-      <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '600' }}>{row.Total}</td>
-    </tr>
-  ))}
+      const filteredRows = rowsForReason.filter(row => selectedAccounts.includes(row.account));
+      const allZero = filteredRows.every(row => !row.reason_Count);
+
+      if (allZero) return null; // Skip this row
+
+      rowRendered = true; // ✅ Mark that a row is rendered
+
+      const totalCount = filteredRows.reduce((sum, row) => sum + (row.reason_Count || 0), 0);
+
+      return (
+        <tr key={reason} style={{ backgroundColor: idx % 2 ? '#f3f6fb' : '#ffffff' }}>
+          <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '600', textAlign: 'center' }}>
+            {reason}
+          </td>
+
+          {selectedAccounts.map(gsp => {
+            const row = rowsForReason.find(r => r.account === gsp);
+            return (
+              <React.Fragment key={gsp}>
+                <td style={{ padding: '8px', border: '1px solid #eee', textAlign: 'center' }}>
+                  {row?.reason_Count ?? 0}
+                </td>
+                <td style={{ padding: '8px', border: '1px solid #eee', textAlign: 'center' }}>
+                  {row?.percentage?.toFixed(2) ?? '0.00'}%
+                </td>
+              </React.Fragment>
+            );
+          })}
+
+          <td style={{ padding: '8px', border: '1px solid #eee', fontWeight: '600', textAlign: 'center' }}>
+            {totalCount}
+          </td>
+        </tr>
+      );
+    });
+
+    return rowRendered ? rows : (
+      <tr>
+        <td colSpan={1 + selectedPendedGsp === 'All' ? 6 : 3} style={{ textAlign: 'center', padding: '16px', fontStyle: 'italic' }}>
+          No result found.
+        </td>
+      </tr>
+    );
+  })()}
+
 </tbody>
 
   </table>
@@ -1198,113 +1703,89 @@ const sortIcon = (col) => {
 
 
         {/* Out of Compliance */}
-        {Object.entries(directorStats).length > 0 && (
-        <div style={{ 
-            paddingTop: '1px', 
-            marginLeft: '-30px',
-            backgroundColor:'#F5F6FA', 
-            borderRadius: '10px' 
-            }}>
-            <h3 style={{
-              fontSize: '19px', 
-              fontWeight: '500', 
-              color: '#003b70', 
-              marginLeft: '20px', 
-              marginBottom: '10px', 
-              marginTop: '10px', 
-              fontFamily: 'Lexend, sans-serif' }}>
-            Out of Compliance
-            </h3>
+    {proclaimSummary.length > 0 && (
+  <div style={{ paddingTop: '1px', marginLeft: '-30px', backgroundColor: '#F5F6FA', borderRadius: '10px' }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginLeft: '20px',
+      marginBottom: '10px',
+      marginTop: '10px',
+      fontFamily: 'Lexend, sans-serif'
+    }}>
+      Out of Compliance
+    </h3>
 
-            <div style={{ marginBottom: '12px', marginLeft: '20px' }}>
-              <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
-                View:
-              </label>
-              <select
-                value={complianceView}
-                onChange={(e) => setComplianceView(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #ccc',
-                  fontSize: '14px',
-                  width: '150px',
-                  fontFamily: 'inherit',
-                  color: '#003b70',
-                  backgroundColor: '#fff',
-                }}
-              >
-                {['Daily', 'Weekly', 'Monthly'].map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '24px',
-            }}>
-            {Object.entries(transformedComplianceTrend).map(([director, values]) => {
-                const chartData = [
-                { label: 'YES', value: values.YES },
-                { label: 'NO', value: values.NO },
-                ];
-
-                return (
-                <div
-                    key={director}
-                    style={{
-                    background: `linear-gradient(to right, ${bgColors[director]} 0%, #ffffff 100%)`,
-                    borderRadius: '10px',
-                    marginBottom: '20px',
-                    marginRight: '-30px',
-                    marginLeft: '20px',
-                    padding: '24px',
-                    width: '450px',
-                    height: '150px',
-                    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    transition: 'transform 0.2s ease',
-                    }}
-                >
-                    <div style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#003b70',
-                    marginBottom: '10px',
-                    marginTop: '-10px',
-                    borderBottom: '1px solid #ddd',
-                    paddingBottom: '5px',
-                    }}>
-                    {director}
-                    </div>
-
-                    <ResponsiveContainer width="80%" height={150}>
-                    <ComposedChart data={values}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" tick={{ angle: -35, fontSize: 10, textAnchor: 'end' }} height={50} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#333' }}/>
-                        <Tooltip />
-
-                        <Bar dataKey="YES" fill={barColors.YES} barSize={20} name="YES" radius={[4, 4, 0, 0]}>
-                        <LabelList dataKey="YES" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-                        </Bar>
-
-                        <Bar dataKey="NO" fill={barColors.NO} barSize={20} name="NO" radius={[4, 4, 0, 0]} stackId="a">
-                        <LabelList dataKey="NO" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-                        </Bar>
-                    </ComposedChart>
-                    </ResponsiveContainer>
-
-                </div>
-                );
-            })}
-            </div>
-        </div>
+    <div style={{ marginBottom: '12px', marginLeft: '20px' }}>
+      <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>View:</label>
+      <select
+        value={outOfComplianceView}
+        onChange={e => setOutOfComplianceView(e.target.value)}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: '1px solid #ccc',
+          fontSize: '14px',
+          width: '150px',
+          fontFamily: 'inherit',
+          color: '#003b70',
+          backgroundColor: '#fff',
+        }}
+      >
+        {['Daily', 'Weekly', 'Monthly'].map(opt =>
+          <option key={opt} value={opt}>{opt}</option>
         )}
+      </select>
+    </div>
+
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
+      {Object.entries(transformComplianceTrend).map(([account, values]) => (
+        <div
+          key={account}
+          style={{
+            background: `linear-gradient(to right, ${bgColors[account] || '#ffffff'} 0%, #ffffff 100%)`,
+            borderRadius: '10px',
+            padding: '24px',
+            width: '450px',
+            height: '180px',
+            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#003b70',
+            marginBottom: '10px',
+            borderBottom: '1px solid #ddd',
+            paddingBottom: '5px'
+          }}>
+            {account}
+          </div>
+
+          <ResponsiveContainer width="100%" height={130}>
+            <ComposedChart data={values}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ angle: -35, fontSize: 10, textAnchor: 'end' }} height={50} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Bar dataKey="YES" fill="#EF5350" barSize={20} name="YES" radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="YES" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+              </Bar>
+              <Bar dataKey="NO" fill="#66BB6A" barSize={20} name="NO" radius={[4, 4, 0, 0]} stackId="a">
+                <LabelList dataKey="NO" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+              </Bar>
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
 
 
 
@@ -1329,31 +1810,30 @@ const sortIcon = (col) => {
     </h3>
 
     <div style={{
-      marginTop: '0px',
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '24px',
-      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
-    }}>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart
-          data={memberProviderSummary.filter(r => r.Department !== 'Total')}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="Department" tick={{ fontSize: 12 }} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-          <Tooltip />
-          <Legend wrapperStyle={{ fontSize: '12px' }} />
-
-          <Bar dataKey="Member" fill="#1E88E5">
-            <LabelList dataKey="Member" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="Provider" fill="#7E57C2">
-            <LabelList dataKey="Provider" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+  marginTop: '0px',
+  backgroundColor: 'white',
+  borderRadius: '12px',
+  padding: '24px',
+  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)'
+}}>
+  <ResponsiveContainer width="100%" height={240}>
+    <BarChart
+      data={memberProvider.filter(r => r.Department !== 'Total')}
+    >
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="Department" tick={{ fontSize: 12 }} />
+      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+      <Tooltip />
+      <Legend wrapperStyle={{ fontSize: '12px' }} />
+      <Bar dataKey="Member" fill="#1E88E5">
+        <LabelList dataKey="Member" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+      </Bar>
+      <Bar dataKey="Provider" fill="#7E57C2">
+        <LabelList dataKey="Provider" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+      </Bar>
+    </BarChart>
+  </ResponsiveContainer>
+</div>
   </div>
 )}
 
@@ -1488,9 +1968,7 @@ const sortIcon = (col) => {
 
 
 
-
-{/* PG Name Summary  */}
-{filteredPgYesRows.length > 0 && (
+{proclaimSummary.length > 0 && (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -1509,6 +1987,31 @@ const sortIcon = (col) => {
       PG Name Summary
     </h3>
 
+    <div style={{ marginBottom: '12px' }}>
+      <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+        Filter by GSP:
+      </label>
+      <select
+        value={selectedPgSummaryGsp}
+        onChange={e => setSelectedPgSummaryGsp(e.target.value)}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: '1px solid #ccc',
+          fontSize: '14px',
+          width: '150px',
+          fontFamily: 'inherit',
+          color: '#003b70',
+          backgroundColor: '#fff',
+        }}
+      >
+        <option value="All">All</option>
+        {[...new Set(pgNameSummary.map(row => row.account))].map(gsp => (
+          <option key={gsp} value={gsp}>{gsp}</option>
+        ))}
+      </select>
+    </div>
+
     <div style={{
       backgroundColor: '#e8f0fe',
       border: '1px solid #c4d4ec',
@@ -1518,7 +2021,6 @@ const sortIcon = (col) => {
       marginTop: '0px',
       boxShadow: '0 4px 8px rgba(0,0,0,0.05)'
     }}>
-      {/* headline */}
       <div style={{
         fontSize: '16px',
         fontWeight: '600',
@@ -1528,33 +2030,26 @@ const sortIcon = (col) => {
         Total PG Names:
       </div>
 
-      {/* bullet list – 2 columns */}
-<ul style={{
-  marginTop: '4px',
-  paddingLeft: '16px',
-  fontSize: '14px',
-  fontWeight: '500',
-  columnCount: 2,
-  columnGap: '40px',
-  maxHeight: '260px',
-  overflowY: 'auto',
-  overflowX: 'hidden',
-  wordWrap: 'break-word',
-  listStyleType: 'disc',
-  whiteSpace: 'normal',
+      <ul style={{
+        marginTop: '4px',
+        paddingLeft: '16px',
+        fontSize: '14px',
+        fontWeight: '500',
+        columnCount: 2,
+        columnGap: '40px',
+        maxHeight: '260px',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        wordWrap: 'break-word',
+        listStyleType: 'disc',
+        whiteSpace: 'normal',
       }}>
-        {Object.entries(
-          filteredPgYesRows.reduce((acc, row) => {
-            const name = (row['PG NAME'] || row['PG Name'] || '').trim();
-            if (name) acc[name] = (acc[name] || 0) + 1;
-            return acc;
-          }, {})
-        )
-          .sort((a, b) => b[1] - a[1])                 // sort by count, descending
-          .map(([name, count]) => (
-            <li key={name}>{name}: {count}</li>
-          ))
-        }
+        {pgNameSummary
+          .filter(row => selectedPgSummaryGsp === 'All' || row.account === selectedPgSummaryGsp)
+          .sort((a, b) => b.pG_Count - a.pG_Count)
+          .map(row => (
+            <li key={row.account + row.pG_NAME3}>{row.pG_NAME3}: {row.pG_Count}</li>
+          ))}
       </ul>
     </div>
   </div>
@@ -1562,123 +2057,141 @@ const sortIcon = (col) => {
 
 
        {/* Fully Insured Summary */}
-                {Object.keys(fullyInsuredStats).length > 0 && (
-                <div style={{ 
-                    paddingTop: '1px',
-                    marginTop: '20px', 
-                    marginLeft: '-30px',
-                    backgroundColor:'#F5F6FA',
-                    borderRadius: '10px',
-                    height: '530px',
-                    
-                    }}>
-                    <h3 style={{fontSize: '19px', fontWeight: '500', color: '#003b70', marginBottom: '10px', marginTop: '10px', fontFamily: 'Lexend, sans-serif', marginLeft: '20px', }}>
-                    Non-ASO
-                    </h3>
-                    <div style={{ marginBottom: '16px', marginLeft: '20px',}}>
-                    <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
-                        Filter by GSP:
-                    </label>
-                    <select
-                        value={selectedDirector}
-                        onChange={(e) => {
-                        const selected = e.target.value;
-                        setSelectedDirector(selected);
-                        calculateFullyInsuredStats(excelData);
-                        }}
-                        style={{
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #ccc',
-                        fontSize: '14px',
-                        width: '150px',
-                        fontFamily: 'inherit',
-                        color: '#003b70',
-                        backgroundColor: '#fff',
-                        }}
+{proclaimSummary.length > 0 && (
+  <div style={{ 
+    paddingTop: '1px',
+    marginTop: '20px', 
+    marginLeft: '-30px',
+    backgroundColor:'#F5F6FA',
+    borderRadius: '10px',
+    height: '530px',
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '10px',
+      fontFamily: 'Lexend, sans-serif',
+      marginLeft: '20px',
+    }}>
+      Non-ASO
+    </h3>
+    <div style={{ marginBottom: '16px', marginLeft: '20px',}}>
+      <label style={{ fontWeight: '500', color: '#003b70', marginRight: '8px' }}>
+        Filter by GSP:
+      </label>
+      <select
+        value={selectedDirector}
+        onChange={(e) => setSelectedDirector(e.target.value)}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: '1px solid #ccc',
+          fontSize: '14px',
+          width: '150px',
+          fontFamily: 'inherit',
+          color: '#003b70',
+          backgroundColor: '#fff',
+        }}
+      >
+        {directorOptions.map((dir, index) => (
+          <option key={index} value={dir}>
+            {dir}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '24px',
+      marginLeft: '20px',
+    }}>
+      {['FI', 'NY', 'TX', 'ASO'].map(region => {
+        const regionData = groupedNonAso[region];
+        if (!regionData || regionData.length === 0) return null;
+
+        return (
+          <div
+            key={region}
+            style={{
+              background: 'linear-gradient(to right, #f4f7fc 0%, #ffffff 100%)',
+              borderRadius: '10px',
+              padding: '24px',                                   
+              marginRight: '-10px',
+              marginBottom: '-10px',
+              width: '780px',
+              height: '150px',
+              maxWidth: '707px',
+              boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#003b70',
+              marginBottom: '10px',
+              marginTop: '-10px',
+              borderBottom: '1px solid #ddd',
+              paddingBottom: '6px',
+            }}>
+              {regionLabels[region] || region}
+
+            </div>
+
+            <ResponsiveContainer width="80%" height={150}>
+            <ComposedChart data={regionData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} height={30} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }}/>
+              <Tooltip />
+             <Bar dataKey="Admin" name="Admin" fill="#753AFC" barSize={20} radius={[4, 4, 0, 0]}>
+              <LabelList
+                dataKey="Admin"
+                position="top"
+                content={({ x, y, width, value, viewBox }) => {
+                  // y is the top of the bar; viewBox.y is the top of the chart area
+                  const minY = viewBox.y + 16; // 16px padding from the top of the chart
+                  const labelY = y < minY ? minY : y - 6;
+                  return (
+                    <text
+                      x={x + width / 2}
+                      y={labelY}
+                      fill="#753AFC"
+                      textAnchor="middle"
+                      fontSize={12}
+                      fontWeight="bold"
                     >
-                        {directorOptions.map((dir, index) => (
-                        <option key={index} value={dir}>
-                            {dir}
-                        </option>
-                        ))}
-                    </select>
-                    </div>
-
-
-                    <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '24px',
-                    marginLeft: '20px',
-                    }}>
-                        {['FI', 'NY', 'TX', 'ASO'].map(region => {
-                            const regionData = fullyInsuredStats[region];
-                            if (!regionData) return null;
-
-                            return (
-                                <div
-                                key={region}
-                                style={{
-                                    background: 'linear-gradient(to right, #f4f7fc 0%, #ffffff 100%)',
-                                    borderRadius: '10px',
-                                    padding: '24px',                                   
-                                    marginRight: '-10px',
-                                    marginBottom: '-10px',
-                                    width: '780px',
-                                    height: '150px',
-                                    maxWidth: '707px',
-                                    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                }}
-                                >
-                                <div style={{
-                                    fontSize: '16px',
-                                    fontWeight: '600',
-                                    color: '#003b70',
-                                    marginBottom: '10px',
-                                    marginTop: '-10px',
-                                    borderBottom: '1px solid #ddd',
-                                    paddingBottom: '6px',
-                                }}>
-                                    {regionLabels[region] || region}
-                                </div>
-
-                                <ResponsiveContainer width="80%" height={150}>
-                                    <ComposedChart data={regionData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" tick={{ angle: -35, fontSize: 10, textAnchor: 'end' }} height={50} />
-                                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }}/>
-                                    <Tooltip />
-
-                                    <Bar dataKey="Admin" name="Admin" fill="#753AFC" barSize={20} radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Admin" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-                                    </Bar>
-
-                                    <Line
-                                        dataKey="Med"
-                                        name="Med"
-                                        type="monotone"
-                                        stroke="#f44336"
-                                        strokeWidth={2}
-                                        dot={{ r: 4 }}
-                                        isAnimationActive={false}
-                                    />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                                </div>
-                            );
-                            })}
-
-                    </div>
-                </div>
-                )}
-
-
+                      {value}
+                    </text>
+                  );
+                }}
+              />
+            </Bar>
+              <Line
+                dataKey="Med"
+                name="Med"
+                type="monotone"
+                stroke="#f44336"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
 {/* Pre-Service Section */}
-{preserviceRows.length > 0 && (
+{proclaimSummary.length > 0 && (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -1701,8 +2214,8 @@ const sortIcon = (col) => {
     Filter by GSP:
   </label>
   <select
-    value={selectedGsp}
-    onChange={(e) => setSelectedGsp(e.target.value)}
+    value={selectedPreSerGsp}
+    onChange={(e) => setSelectedPreSerGsp(e.target.value)}
     style={{
       padding: '8px 12px',
       borderRadius: '6px',
@@ -1714,7 +2227,7 @@ const sortIcon = (col) => {
       backgroundColor: '#fff',
     }}
   >
-    {['All', 'Sagility', 'Concentrix', 'Wipro'].map((gsp) => (
+    {['All',  'Onshore', 'Sagility', 'Concentrix'].map((gsp) => (
       <option key={gsp} value={gsp}>
         {gsp}
       </option>
@@ -1738,7 +2251,7 @@ const sortIcon = (col) => {
     fontWeight: '600',
     color: '#003b70'
   }}>
-    Total Pre-Service Appeals: {filteredPreserviceRows.length}
+    Total Pre-Service Appeals: {preserviceTotal}
   </div>
 </div>
 
@@ -1759,45 +2272,70 @@ const sortIcon = (col) => {
           </tr>
         </thead>
         <tbody>
-          {filteredPreserviceRows.map((row, idx) => (
-            <tr key={idx}>
-              {Object.keys(preserviceColumnMap).map((excelKey) => (
-                <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
-                  {preserviceDateFields.includes(excelKey)
-                    ? formatExcelDate(row[excelKey])
-                    : (row[excelKey] ?? '')}
-                </td>
-              ))}
-              <td style={{ padding: '8px', border: '1px solid #eee' }}>
-                <button
-                  onClick={() => {
-                    setSelectedRow(row);
-                    setShowModal(true);
-                  }}
-                  style={{
-                    backgroundColor: '#0071ce',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  View
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
+  {isPreserviceLoading ? (
+    <tr>
+      <td colSpan={Object.keys(preserviceColumnMap).length + 1} style={{ textAlign: 'center', padding: '16px' }}>
+        Loading...
+      </td>
+    </tr>
+  ) : preserviceRows.length === 0 ? (
+    <tr>
+      <td colSpan={Object.keys(preserviceColumnMap).length + 1} style={{ textAlign: 'center', padding: '16px' }}>
+        No result found.
+      </td>
+    </tr>
+  ) : (
+    preserviceRows.map((row, idx) => (
+      <tr key={idx}>
+        {Object.keys(preserviceColumnMap).map((excelKey) => (
+          <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
+            {preserviceDateFields.includes(excelKey)
+              ? formatExcelDate(row[excelKey])
+              : (row[excelKey] ?? '')}
+          </td>
+        ))}
+        <td style={{ padding: '8px', border: '1px solid #eee' }}>
+          <button
+            onClick={() => {
+              setSelectedRow(row);
+              setShowModal(true);
+            }}
+            style={{
+              backgroundColor: '#0071ce',
+              color: 'white',
+              border: 'none',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+          >
+            View
+          </button>
+        </td>
+      </tr>
+    ))
+  )}
+</tbody>
       </table>
+
+      <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
+  <button
+    onClick={() => setPreservicePage(p => Math.max(1, p - 1))}
+    disabled={preservicePage === 1}
+  >Prev</button>
+  <span>Page {preservicePage}</span>
+  <button
+    onClick={() => setPreservicePage(p => p * preservicePageSize < preserviceTotal ? p + 1 : p)}
+    disabled={preservicePage * preservicePageSize >= preserviceTotal}
+  >Next</button>
+</div>
     </div>
   </div>
 )}
 
 
-{/* PG YES Section */}
-{pgYesRows.length > 0 && (
+{proclaimSummary.length > 0 && (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -1821,8 +2359,11 @@ const sortIcon = (col) => {
         Filter by GSP:
       </label>
       <select
-        value={selectedPgGsp}
-        onChange={(e) => setSelectedPgGsp(e.target.value)}
+        value={selectedPgYesGsp}
+        onChange={(e) => {
+          setSelectedPgYesGsp(e.target.value);
+          setPgYesPage(1); // Reset to first page on filter change
+        }}
         style={{
           padding: '8px 12px',
           borderRadius: '6px',
@@ -1834,7 +2375,7 @@ const sortIcon = (col) => {
           backgroundColor: '#fff',
         }}
       >
-        {['All', 'Sagility', 'Concentrix', 'Wipro'].map((gsp) => (
+        {['All', 'Onshore','Sagility', 'Concentrix'].map((gsp) => (
           <option key={gsp} value={gsp}>
             {gsp}
           </option>
@@ -1859,7 +2400,7 @@ const sortIcon = (col) => {
         fontWeight: '600',
         color: '#003b70'
       }}>
-        Total PG Appeals: {filteredPgYesRows.length}
+        Total PG Appeals: {pgYesTotal}
       </div>
     </div>
 
@@ -1878,38 +2419,63 @@ const sortIcon = (col) => {
           </tr>
         </thead>
         <tbody>
-          {filteredPgYesRows.map((row, idx) => (
-            <tr key={idx}>
-              {Object.keys(preserviceColumnMap).map((excelKey) => (
-                <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
-                  {preserviceDateFields.includes(excelKey)
-                    ? formatExcelDate(row[excelKey])
-                    : (row[excelKey] ?? '')}
-                </td>
-              ))}
-              <td style={{ padding: '8px', border: '1px solid #eee' }}>
-                <button
-                  onClick={() => {
-                    setSelectedRow(row);
-                    setShowModal(true);
-                  }}
-                  style={{
-                    backgroundColor: '#0071ce',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  View
-                </button>
+          {isPgYesLoading ? (
+            <tr>
+              <td colSpan={Object.keys(preserviceColumnMap).length + 1} style={{ textAlign: 'center', padding: '16px' }}>
+                Loading...
               </td>
             </tr>
-          ))}
+          ) : pgYesRows.length === 0 ? (
+            <tr>
+              <td colSpan={Object.keys(preserviceColumnMap).length + 1} style={{ textAlign: 'center', padding: '16px' }}>
+                No result found.
+              </td>
+            </tr>
+          ) : (
+            pgYesRows.map((row, idx) => (
+              <tr key={idx}>
+                {Object.keys(preserviceColumnMap).map((excelKey) => (
+                  <td key={excelKey} style={{ padding: '8px', border: '1px solid #eee' }}>
+                    {preserviceDateFields.includes(excelKey)
+                      ? formatExcelDate(row[excelKey])
+                      : (row[excelKey] ?? '')}
+                  </td>
+                ))}
+                <td style={{ padding: '8px', border: '1px solid #eee' }}>
+                  <button
+                    onClick={() => {
+                      setSelectedRow(row);
+                      setShowModal(true);
+                    }}
+                    style={{
+                      backgroundColor: '#0071ce',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    View
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
+      <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
+        <button
+          onClick={() => setPgYesPage(p => Math.max(1, p - 1))}
+          disabled={pgYesPage === 1}
+        >Prev</button>
+        <span>Page {pgYesPage}</span>
+        <button
+          onClick={() => setPgYesPage(p => p * pgYesPageSize < pgYesTotal ? p + 1 : p)}
+          disabled={pgYesPage * pgYesPageSize >= pgYesTotal}
+        >Next</button>
+      </div>
     </div>
   </div>
 )}

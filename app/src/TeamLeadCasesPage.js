@@ -341,17 +341,17 @@ const toggleSelectAll = () => {
 };
 
 // // --- Row checkbox toggle ---
-// const toggleRowSelection = (row) => {
-//   const status = getOwnerHelperValue(row);
-//   if (status === 'COMPLETED') return; // ✅ Prevent selecting completed rows
+const toggleRowSelection = (row) => {
+  const status = getOwnerHelperValue(row);
+  if (status === 'COMPLETED') return; // ✅ Prevent selecting completed rows
 
-//   setSelectedRows((prev) => {
-//     const exists = prev.some((sel) => sel['SR'] === row['SR']);
-//     return exists
-//       ? prev.filter((sel) => sel['SR'] !== row['SR'])
-//       : [...prev, row];
-//   });
-// };
+  setSelectedRows((prev) => {
+    const exists = prev.some((sel) => sel['SR'] === row['SR']);
+    return exists
+      ? prev.filter((sel) => sel['SR'] !== row['SR'])
+      : [...prev, row];
+  });
+};
 
 
 

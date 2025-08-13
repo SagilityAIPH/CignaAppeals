@@ -15,7 +15,7 @@ import {
   LabelList,
 } from "recharts";
 import axios from 'axios';
-import { dataApiUrl, dataApiEmailUrl } from './config';
+import { dataApiUrl, dataApiEmailUrl, exportAPI } from './config';
 import { getPocid } from './pocConfig';
 /* ----------------------------- SAMPLE DATA -------------------------------- */
 // Hard-coded age-bucket numbers for the preview.
@@ -396,7 +396,6 @@ const fetchCasesAll = async () => {
   let totalPages = 1;
 
 
-
   try {
     while (page <= totalPages) {
       const res = await axios.post(`${dataApiUrl}cases_tbl_all_poc?pageNumber=${page}&pageSize=${tempPageSize}`, {
@@ -669,6 +668,42 @@ const handleSendSummaryCountEmail = async () => {
 };
 
 
+const handleExtractExcel = async () => {
+  try {
+    const response = await axios.get(`${exportAPI}export_appeals`, {
+      responseType: 'blob', // Important for file download
+    });
+
+    // Try to extract filename from Content-Disposition header
+    let filename;
+    const disposition = response.headers['content-disposition'];
+    if (disposition && disposition.indexOf('filename=') !== -1) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+    // If not present, use the fallback format
+    if (!filename) {
+      const now = new Date();
+      const pad = n => n.toString().padStart(2, '0');
+      filename = `appeals_raw_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.xlsx`;
+    }
+
+    // Create a link to download the file
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    alert('Failed to export Excel file.');
+    console.error(error);
+  }
+};
 
 // useEffect(() => {
 //   const start = (currentPage - 1) * pageSize;
@@ -1232,7 +1267,7 @@ const handleReassignAppeals = async () => {
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           {/* <button onClick={handleAutoEmail} style={{ backgroundColor: "#00aaff", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Auto email</button> */}
           <button onClick={handleRefresh} style={{ backgroundColor: "#00aaff", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Refresh</button>
-          <button style={{ backgroundColor: "#217346", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Extract Excel</button>
+          <button   onClick={handleExtractExcel} style={{ backgroundColor: "#217346", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Extract Excel</button>
           </div>
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleFileSelect} />
         </div>
