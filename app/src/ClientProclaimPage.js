@@ -94,7 +94,7 @@ const [selectedPreSerGsp, setSelectedPreSerGsp] = useState('All');
        fetchComplianceRawData()
        fetchPgNameSummary();
        fetchNonAsoSummary();
-      
+      fetchPreserviceRows();
     }, []);
 
     const fetchNonCompliant = async () => {
@@ -224,19 +224,22 @@ function fetchComplianceRawData(){
 }
 
   const fetchNonAsoStats2 = async () => {
-    try {
-      const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
-        params: { director: selectedDirector === 'All' ? '' : selectedDirector }
-      });
-      setNonAsoStats(res.data || []);
-      // Set director options dynamically
-      const dirs = Array.from(new Set((res.data || []).map(row => row.director).filter(Boolean)));
-      setDirectorOptions(['All', ...dirs]);
-    } catch (err) {
-      setNonAsoStats([]);
-      setDirectorOptions(['All']);
-      console.error('Error fetching Non-ASO stats:', err);
-    }
+     try {
+    const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
+      params: { director: selectedDirector === 'All' ? '' : selectedDirector }
+    });
+    setNonAsoStats(res.data || []);
+    // Only allow Sagility, Concentrix, Onshore
+    const allowed = ['Sagility', 'Concentrix', 'Onshore'];
+    const dirs = Array.from(new Set((res.data || [])
+      .map(row => row.director)
+      .filter(d => allowed.includes(d))));
+    setDirectorOptions(['All', ...dirs]);
+  } catch (err) {
+    setNonAsoStats([]);
+    setDirectorOptions(['All']);
+    console.error('Error fetching Non-ASO stats:', err);
+  }
   };
 useEffect(() => {
 
@@ -260,6 +263,30 @@ const regionLabels = {
   TX: 'Fully Insured - Texas',
   ASO: 'ASO',
 };
+
+const trendChartData = useMemo(() => {
+  // Group by date, then flatten by account
+  const grouped = {};
+  summaryData.forEach(row => {
+    const date = row.upload_Date?.split('T')[0];
+    const account = row.account?.trim();
+    if (!date || !account || account === 'Total') return;
+    if (!grouped[date]) grouped[date] = [];
+    grouped[date].push({
+      date,
+      account,
+      Assigned: row.assigned_Count || 0,
+      Open: row.open_Count || 0,
+      Pended: row.pended_Count || 0,
+      Completed: row.completed_Count || 0,
+      FFup_Sent: row.ffUp_Sent || 0
+    });
+  });
+  // Flatten and filter out any accidental "Total" bars
+  return Object.values(grouped).flat().filter(d => d.account !== 'Total' && d.date !== 'Total');
+}, [summaryData]);
+
+
 
 const groupedNonAso = useMemo(() => {
   // Group by region, then by upload_date (or date if you have it)
@@ -812,7 +839,7 @@ setLatestProclaimCounts(latestProclaimCounts);
 
 
   // ✅ Director dropdown
-  const allowedDirectors = ['Sagility', 'Concentrix', 'Wipro'];
+  const allowedDirectors = ['Sagility', 'Concentrix', 'Onshore'];
   const directors = json
     .map(row => (row['Director'] || '').trim())
     .filter(name => allowedDirectors.includes(name));
@@ -1485,30 +1512,45 @@ const sortIcon = (col) => {
         </select>
       </div>
 
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart data={transformTrend}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-          <Tooltip />
-          <Legend wrapperStyle={{ fontSize: '12px' }} />
-          <Bar dataKey="Assigned" fill="#1E88E5">
-            <LabelList dataKey="Assigned" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="Open" fill="#00ACC1">
-            <LabelList dataKey="Open" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="Pended" fill="#FFB300">
-            <LabelList dataKey="Pended" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="Completed" fill="#66BB6A">
-            <LabelList dataKey="Completed" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-          <Bar dataKey="FFup_Sent" fill="#AB47BC">
-            <LabelList dataKey="FFup Sent" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+     <ResponsiveContainer width="100%" height={240}>
+  <BarChart data={trendChartData}>
+    <CartesianGrid strokeDasharray="3 3" />
+    <XAxis
+      dataKey="date"
+      tick={{ fontSize: 12 }}
+      interval={0}
+      // Show both date and account
+      tickFormatter={(value, index) => {
+        const account = trendChartData[index]?.account || '';
+        return `${value}\n${account}`;
+      }}
+    />
+    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+    <Tooltip
+      formatter={(value, name, props) => [value, name]}
+      labelFormatter={(label, props) => {
+        const account = props?.payload?.account || '';
+        return `${label} (${account})`;
+      }}
+    />
+    <Legend wrapperStyle={{ fontSize: '12px' }} />
+    <Bar dataKey="Assigned" fill="#1E88E5" name="Assigned">
+      <LabelList dataKey="Assigned" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+    </Bar>
+    <Bar dataKey="Open" fill="#00ACC1" name="Open">
+      <LabelList dataKey="Open" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+    </Bar>
+    <Bar dataKey="Pended" fill="#FFB300" name="Pended">
+      <LabelList dataKey="Pended" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+    </Bar>
+    <Bar dataKey="Completed" fill="#66BB6A" name="Completed">
+      <LabelList dataKey="Completed" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+    </Bar>
+    <Bar dataKey="FFup_Sent" fill="#AB47BC" name="FFup Sent">
+      <LabelList dataKey="FFup_Sent" position="top" style={{ fontSize: 10, fontWeight: 'bold' }} />
+    </Bar>
+  </BarChart>
+</ResponsiveContainer>
     </div>
 
     {/* === main bar chart ===================================================== */}
@@ -2095,10 +2137,11 @@ const sortIcon = (col) => {
           backgroundColor: '#fff',
         }}
       >
-        {directorOptions.map((dir, index) => (
-          <option key={index} value={dir}>
-            {dir}
-          </option>
+          {['All', 'Onshore','Sagility', 'Concentrix']
+          .map((dir, index) => (
+            <option key={index} value={dir}>
+              {dir}
+            </option>
         ))}
       </select>
     </div>
@@ -2483,7 +2526,7 @@ const sortIcon = (col) => {
 
 
 {/* Gold & Bronze Section */}
-{gnbSummary.length > 0 && (
+{/* {gnbSummary.length > 0 && (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -2535,8 +2578,8 @@ const sortIcon = (col) => {
           ))}
         </tbody>
       </table>
-    </div>
-
+    </div> */}
+{/* 
 {gnbSummary.length > 0 && (
   <div style={{
     marginTop: '20px',
@@ -2593,7 +2636,7 @@ const sortIcon = (col) => {
 
 
   </div>
-)}
+)} */}
 
 
 {/* Modal for viewing full row */}
@@ -2675,6 +2718,6 @@ const sortIcon = (col) => {
 
     </div>
   );
+//}
 }
-
 export default ClientProclaimPage;

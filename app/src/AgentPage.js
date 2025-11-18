@@ -3,13 +3,13 @@ import React, { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { MdDashboard, MdBarChart, MdPeople } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
-
+import { useUser } from './UserContext';
 function AgentPage({ children }) {
   const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState(null);
-
+  const { user } = useUser();
   const loginState = JSON.parse(sessionStorage.getItem("loginState"));
-  const managerName = loginState?.managerNameRaw || "User";
+  const managerName = user?.fullName || "User";
 
   const handleNavClick = (path, itemKey) => {
     setSelectedItem(itemKey);

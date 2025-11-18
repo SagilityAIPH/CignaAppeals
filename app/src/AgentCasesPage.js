@@ -14,11 +14,11 @@ import {
 import { useLocation } from 'react-router-dom'; // ⬅️ Add this line at the top
 import axios from "axios";
 import { dataApiUrl } from './config';
-
+import { useUser } from "./UserContext";
 function AgentCasesPage() {
 const location = useLocation();
 
-
+    const { agentId } = useUser();
     const [preserviceRows, setPreserviceRows] = useState([]);
     const [preserviceHeaders, setPreserviceHeaders] = useState([]);
     const [selectedRow, setSelectedRow] = useState(null);
@@ -28,7 +28,9 @@ const location = useLocation();
     const [filterColumn, setFilterColumn] = useState('');
     const [filterValue, setFilterValue] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);
-    const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Open' | 'Completed'
+    const [statusFilter, setStatusFilter] = useState('All');
+    const [newAssignmentFilter, setNewAssignmentFilter] = useState('All');
+    // 'All' | 'Open' | 'Completed'
 const [showPendingModal, setShowPendingModal] = useState(false);
 const [showCompletedModal, setShowCompletedModal] = useState(false);
 const [pendingReason, setPendingReason] = useState('');
@@ -126,8 +128,6 @@ useEffect(() => {
 
 }, []);
         // ← runs once on mount
-
-
 // const fetchCasesAll = async () => {
 //   let allData = [];
 //   let page = 1;
@@ -175,8 +175,10 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
 
   try {
     const res = await axios.post(`${dataApiUrl}cases_tbl_all_agent?pageNumber=${page}&pageSize=${size}`, {
-      agent: 'SG010521',
+      //agent: 'SG012166',
+      agent: agentId,
       caseStatus: statusFilter === 'All' ? '' : statusFilter,
+      new_assignment: newAssignmentFilter === 'All' ? '' : newAssignmentFilter
       //assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter
     });
 
@@ -206,7 +208,7 @@ useEffect(() => {
   setCurrentPage(1);
   fetchCasesPage(1, pageSize)
   fetchStatusCounts();
-}, [statusFilter]);
+}, [statusFilter, newAssignmentFilter]);
 
 useEffect(() => {
   fetchCasesPage(currentPage, pageSize);
@@ -220,6 +222,13 @@ useEffect(() => {
     fetchCasesPage(1, pageSize);
     fetchStatusCounts();
 }, []);
+
+
+useEffect(() => {
+  if (!agentId) return;
+  fetchCasesPage(1, pageSize);
+  fetchStatusCounts();
+}, [agentId]);
   
 
 // useEffect(() => {
@@ -308,7 +317,7 @@ const [statusCounts, setStatusCounts] = useState({
 });
 
 const fetchStatusCounts = async () => {
-  const agent = 'SG010521';
+  const agent = agentId;
 
   try {
     const res = await axios.get(`${dataApiUrl}get_cases_status_agent_ct`, {
@@ -1082,6 +1091,35 @@ const ownedRows = preserviceRows.filter(
       <option value="Completed">Completed</option>
       <option value="Pended">Pended</option>
       <option value="FFup Sent">FFup Sent</option>
+    </select>
+  </div>
+
+  <div style={{ width: '200px' }}>
+    <label
+      style={{
+        fontWeight: '500',
+        color: '#003b70',
+        display: 'block',
+        marginBottom: '4px'
+          
+      }}
+    >
+      Filter by Assignment:
+    </label>
+    <select
+      value={newAssignmentFilter}
+      onChange={(e) => setNewAssignmentFilter(e.target.value)}
+      style={{
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid #ccc',
+        width: '100%',
+        fontFamily: 'inherit'
+      }}
+    >
+       <option value="All">All</option>
+      <option value="Y">New Assignment</option>
+      <option value="N">Pended</option>
     </select>
   </div>
 

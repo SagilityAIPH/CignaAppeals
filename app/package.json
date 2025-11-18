@@ -4,14 +4,17 @@
   "private": true,
   "homepage": "/pages/cigna_appeals",
   "dependencies": {
+    "@okta/okta-auth-js": "^7.14.0",
+    "@okta/okta-react": "^6.10.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^13.2.1",
-    "axios": "^1.9.0",
+    "axios": "^1.13.2",
     "bootstrap": "^5.3.6",
     "bootstrap-icons": "^1.13.1",
     "file-saver": "^2.0.5",
+    "jwt-decode": "^4.0.0",
     "react": "^19.1.0",
     "react-bootstrap": "^2.10.9",
     "react-dom": "^19.1.0",
@@ -33,7 +36,6 @@
     "deploy": "gh-pages -d build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
-    
   },
   "eslintConfig": {
     "extends": [

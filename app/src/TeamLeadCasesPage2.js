@@ -14,9 +14,11 @@ import {
 import { useLocation } from "react-router-dom"; // ⬅️ Add this line at the top
 import axios from "axios";
 import { dataApiUrl, dataApiEmailUrl } from "./config";
+import { useUser } from "./UserContext";
 
 function TeamLeadCasesPage() {
   const location = useLocation();
+  const { user } = useUser();
 
   const stateFromRoute = location.state;
   const stateFromStorage = JSON.parse(
@@ -54,6 +56,7 @@ function TeamLeadCasesPage() {
   const [agentList, setAgentList] = useState([]);
   const [ageBucketData, setAgeBucketData] = useState([]);
   const [caseStatusCt, setCaseStatusCt] = useState([]);
+  const [caseStatusPerAgent, setCaseStatusPerAgent] = useState([]);
   let totalStatusCt = 0;
   const [caseTblAll, setCaseTblAll] = useState([]);
   const [showFollowToast, setShowFollowToast] = useState(false);
@@ -77,18 +80,21 @@ function TeamLeadCasesPage() {
     OwnerID: "",
     OwnerName: "",
   });
-
+ 
   const [caseStatusFilter, setCaseStatusFilter] = useState("All"); 
   const [assignmentFilter, setAssignmentFilter] = useState("All"); 
   const [totalAppealCases, setTotalAppealCases] = useState(0); 
   const totalPages2 = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
+
+  const { teamLeadId } = useUser();
+
   const fetchAgeBucketSummary = async () => {
-    const teamLeadId = 'M124100';
+    const teamLeadId_param = teamLeadId;
   
     try {
       const res = await axios.get(`${dataApiUrl}get_age_bucket_teamlead`, {
-        params: { teamLeadId }
+        params: { teamLeadId: teamLeadId_param }
       });
   
      
@@ -113,11 +119,11 @@ function TeamLeadCasesPage() {
 
  
   const fetchCaseStatusCt = async () => {
-    const teamLeadId = 'M124100';
+    const teamLeadId_param = teamLeadId;
   
     try {
       const res = await axios.get(`${dataApiUrl}get_cases_status_ct_teamlead`, {
-        params: { teamlead: teamLeadId }
+        params: { teamlead: teamLeadId_param }
       });
   
       if (res.data) {
@@ -128,6 +134,25 @@ function TeamLeadCasesPage() {
     } catch (error) {
       console.error("Failed to fetch case status:", error);
       setCaseStatusCt(null);
+    }
+  };
+
+  const fetchCaseStatusPerAgent = async () => {
+    const teamLeadId_param = teamLeadId;
+  
+    try {
+      const res = await axios.get(`${dataApiUrl}get_cases_status_ct_teamlead_per_agent`, {
+        params: { teamlead: teamLeadId_param  }
+      });
+  
+      if (res.data) {
+        setCaseStatusPerAgent(res.data);
+      } else {
+        setCaseStatusPerAgent([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch case status per agent:", error);
+      setCaseStatusPerAgent([]);
     }
   };
 
@@ -155,12 +180,13 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
         break;
     }
 
+    const teamLeadId_param = teamLeadId;
 
   try {
     const res = await axios.post(`${dataApiUrl}cases_tbl_all_teamlead?pageNumber=${page}&pageSize=${size}`, {
-      teamlead: 'M124100',
+      teamlead: teamLeadId_param,
       caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
-      assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter.charAt,
+      assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
       ...prioritizationPayload
     });
 
@@ -302,11 +328,13 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     setCurrentPage(1);
     fetchCasesPage(1, pageSize)
     fetchAgeBucketSummary()
-      fetchCaseStatusCt()
+    fetchCaseStatusCt()
+    fetchCaseStatusPerAgent()
   }, [caseStatusFilter, assignmentFilter, prioritizationFilter]);
 
   useEffect(() => {
-    setCurrentPage2(1); // Reset page
+    setCurrentPage(1); // Reset page
+    fetchCasesPage(1, pageSize)
   }, [pageSize]);
   
   useEffect(() => {
@@ -319,6 +347,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     fetchAgents();
       fetchAgeBucketSummary()
       fetchCaseStatusCt()
+      fetchCaseStatusPerAgent()
       fetchCasesPage(1, pageSize)
 // Reset upload state on mount
   }, []);
@@ -377,12 +406,12 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     }
   
     try {
-      if (status === 'FFup Sent') {
+      if (!(status === '')) {
         // ✅ Just update the status (no assignment)
         try {
           await axios.post(`${dataApiUrl}appeal_cases_status_update`, {
             ids: idsToUpdate,
-            status: 'FFup Sent',
+            status: status,
             pend_reason: null
           }, {
             headers: {
@@ -455,9 +484,9 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       setSelectedRows([]);
       setAssignTo([]);
   
-      if (status !== 'FFup Sent') {
+      //if (status !== 'FFup Sent') {
         alert(`Status updated to ${status} successfully.`);
-      }
+      //}
   
     } catch (error) {
       console.error(`Failed to update case status to ${status}:`, error);
@@ -501,7 +530,7 @@ const handleReassignAppeals = async () => {
       //console.error(`Failed to send email to ${agent.agent_name}:`, error.response?.data || error.message);
     }
   }
-
+ fetchCasesPage(1, pageSize);
 };
 
 
@@ -576,6 +605,7 @@ const handleSendFollowUpEmails = async () => {
   // Step 3: Update status for all selected rows
   try {
     await handleUpdateAssignedStatus({ status: "FFup Sent" });
+     fetchCasesPage(currentPage2, pageSize);
   } catch (err) {
     console.error("Error updating status", err);
   }
@@ -997,25 +1027,24 @@ if (caseStatusFilter === "Pended" || caseStatusFilter === "Open") {
   );
 
   // ⬇️ INSERT THIS HERE
-  const managerCasesWithStatus = useMemo(() => {
-    return preserviceRows
-      .filter(
-        (r) =>
-          (r["Manager"] || "").trim().toLowerCase() ===
-          managerNameRaw.trim().toLowerCase()
-      )
-      .map((r) => ({
-        ...r,
-        _STATUS: getOwnerHelperValue(r),
-      }));
-  }, [preserviceRows, managerNameRaw]);
+  // const managerCasesWithStatus = useMemo(() => {
+  //   return preserviceRows
+  //     .filter(
+  //       (r) =>
+  //         (r["Manager"] || "").trim().toLowerCase() ===
+  //         managerNameRaw.trim().toLowerCase()
+  //     )
+  //     .map((r) => ({
+  //       ...r,
+  //       _STATUS: getOwnerHelperValue(r),
+  //     }));
+  // }, [preserviceRows, managerNameRaw]);
 
-  const isAllSelected =
-    caseTblAll.length > 0 &&
-    caseTblAll.every((row) =>
-      selectedRows.some((selected) => selected["SR"] === row["SR"])
-    );
-
+const isAllSelected =
+  caseTblAll.length > 0 &&
+  caseTblAll.every(row =>
+    selectedRows.some(selected => selected.id === row.id)
+  );
   const toggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedRows([]);
@@ -1223,7 +1252,7 @@ const fetchCaseDetailsById = async (id) => {
 
       {/* Total Appeals Summary Section */}
       {/* Total Appeals Summary Section */}
-      {gnbSummary.length > 0 && (
+      {preserviceRows.length >= 0 && (
         <div
           style={{
             marginTop: "0px",
@@ -1507,6 +1536,136 @@ const fetchCaseDetailsById = async (id) => {
                     ))}
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Case Status Per Agent Table */}
+      {caseStatusPerAgent.length > 0 && (
+        <div
+          style={{
+            marginTop: "20px",
+            marginLeft: "-30px",
+            backgroundColor: "#F5F6FA",
+            borderRadius: "10px",
+            padding: "20px",
+            fontFamily: "Lexend, sans-serif",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "19px",
+              fontWeight: "500",
+              color: "#003b70",
+              marginBottom: "16px",
+              marginTop: "0px",
+            }}
+          >
+            Case Status Per Agent
+          </h3>
+
+          <div
+            style={{
+              border: "1px solid #ddd",
+              borderRadius: "8px",
+              overflow: "hidden",
+              backgroundColor: "white",
+            }}
+          >
+            <div
+              style={{
+                maxHeight: "400px",
+                overflowY: "auto",
+                overflowX: "auto",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: "13px",
+                }}
+              >
+                <thead
+                  style={{
+                    backgroundColor: "#00bcd4",
+                    color: "white",
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 1,
+                  }}
+                >
+                  <tr>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "left", fontWeight: "600" }}>
+                      Owner ID
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "left", fontWeight: "600" }}>
+                      Owner Name
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      Open
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      Pended
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      Completed
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      FFup Sent
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      Assigned
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      Unassigned
+                    </th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {caseStatusPerAgent.map((agent, idx) => (
+                    <tr
+                      key={agent.ownerID}
+                      style={{
+                        backgroundColor: idx % 2 === 0 ? "#ffffff" : "#f9fbff",
+                      }}
+                    >
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "left" }}>
+                        {agent.ownerID}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "left" }}>
+                        {agent.ownerName}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                        {agent.open || 0}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                        {agent.pended || 0}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                        {agent.completed || 0}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                        {agent.fFup_Sent || 0}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                        {agent.assigned || 0}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                        {agent.unassigned || 0}
+                      </td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center", fontWeight: "600" }}>
+                        {agent.total_Count || 0}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -2255,7 +2414,7 @@ const fetchCaseDetailsById = async (id) => {
               };
             });
             handleUpdateAssignedStatus({ status: "Assigned" });
-            //handleReassignAppeals();
+            handleReassignAppeals();
             setPreserviceRows(updated);
             setSelectedRows([]);
             setAssignTo([]);
@@ -2342,7 +2501,7 @@ const fetchCaseDetailsById = async (id) => {
                     }
                     return row;
                   });
-
+                  handleSendFollowUpEmails(); 
                   setPreserviceRows(updated);
                   setSelectedRows([]);
                   setShowFollowUpModal(false);
@@ -2515,7 +2674,7 @@ const fetchCaseDetailsById = async (id) => {
                     return row;
                   });
                   //handleUpdateAssignedStatus({ status: "Assigned" });    
-                  //handleReassignAppeals();
+                  handleReassignAppeals();
                   setPreserviceRows(updated);
                   setSelectedRows([]);
                   setAssignTo("");

@@ -1,7 +1,7 @@
 // POCPage.js
 import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import * as XLSX from 'xlsx';
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { MdDashboard, MdBarChart, MdPeople } from "react-icons/md"; // reserved icons
 import {
   ResponsiveContainer,
@@ -16,7 +16,8 @@ import {
 } from "recharts";
 import axios from 'axios';
 import { dataApiUrl, dataApiEmailUrl, exportAPI } from './config';
-import { getPocid } from './pocConfig';
+
+import { useUser } from './UserContext';
 /* ----------------------------- SAMPLE DATA -------------------------------- */
 // Hard-coded age-bucket numbers for the preview.
 // Replace these with live data once the Excel parsing is wired up.
@@ -98,7 +99,8 @@ function POCPage() {
   const fileInputRef = useRef(null);
 
   const loginState = JSON.parse(sessionStorage.getItem("loginState"));
-  const managerName = loginState?.managerNameRaw || "User";
+  const {user} = useUser();
+  const managerName = user?.fullName || "User";
   const [preserviceRows, setPreserviceRows] = useState([]);
   const [preserviceHeaders, setPreserviceHeaders] = useState([]);
   const [caseStatusFilter, setCaseStatusFilter] = useState("All");
@@ -113,6 +115,7 @@ function POCPage() {
   const [assignTo, setAssignTo] = useState([]);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [showFollowToast, setShowFollowToast] = useState(false);
+  const [agentSearchTerm, setAgentSearchTerm] = useState("");
   const [caseTblAllPoc, setCaseTblAllPoc] = useState([]);
 const [casesData, setCasesData] = useState([]);
 const [totalAppealCases, setTotalAppealCases] = useState([]);
@@ -136,6 +139,25 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   const [ageSummary, setAgeSummary] = useState([]);
   const [caseStatusCt, setCaseStatusCt] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const { pocId } = useUser();
+
+  // Filter agents based on search term
+  const filteredAgents = useMemo(() => {
+    if (!agentSearchTerm) return [];
+    
+    return agentList
+      .filter(agent => {
+        if (!agent.agent_name_withId) return false;
+        const lower = agent.agent_name_withId.toLowerCase();
+        return (
+          !lower.includes("proclaim_queu") &&
+          !lower.includes("queue") &&
+          !lower.startsWith("sagproc") &&
+          lower.includes(agentSearchTerm.toLowerCase())
+        );
+      })
+      .slice(0, 10); // Limit to 10 results for performance
+  }, [agentList, agentSearchTerm]);
 
   const bulkUpdateCases = (actionType) => {
     const updatedRows = preserviceRows.map((row) => {
@@ -493,7 +515,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     const res = await axios.post(
       `${dataApiUrl}cases_tbl_all_poc?pageNumber=${page}&pageSize=${size}`,
       {
-        poc: getPocid(),
+        poc: pocId,
         caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
         assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
         ...prioritizationPayload
@@ -531,7 +553,16 @@ useEffect(() => {
   fetchCasesPage(currentPage, pageSize);
 }, [currentPage, pageSize]);
 
+const location = useLocation();
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const jwt = params.get("jwt");
+    if (jwt) {
+      localStorage.setItem("authToken", jwt);
+      // optionally decode & set user info
+    }
+  }, [location]);
 
 useEffect(() => {
   fetchAgents();
@@ -597,7 +628,7 @@ const handleSort = (columnKey) => {
 
 
 const fetchCaseStatusCt = async () => {
-let poc = getPocid()
+let poc = pocId
   try {
     const res = await axios.get(`${dataApiUrl}get_cases_status_ct_poc`, {
       params: { poc }
@@ -628,7 +659,6 @@ const handleRefresh = async () => {
          setPageSize(10); 
 };
 
-
 const handleAutoEmail = async () => {
   try {
     const response = await axios.post(`${dataApiEmailUrl}AutoSendAppealsEmail`);
@@ -645,7 +675,7 @@ const handleAutoEmail = async () => {
 };
 
 const handleSendSummaryCountEmail = async () => {
-  const pocId = getPocid(); // Replace with dynamic value if needed
+  const pocId = pocId; // Replace with dynamic value if needed
 
   try {
     const response = await axios.post(
@@ -725,7 +755,7 @@ const fetchCaseDetailsById = async (id) => {
 const fetchAgeBuckets = async () => {
 
   try {
-    const res = await axios.get(`${dataApiUrl}get_age_bucket_poc?poc=${getPocid()}`);
+    const res = await axios.get(`${dataApiUrl}get_age_bucket_poc?poc=${pocId}`);
     const data = res.data || [];
 
     // For filtering
@@ -823,6 +853,8 @@ const fetchAgeBuckets = async () => {
    
     // ✅ Upload and wait for data refresh
     await uploadCsv(file); 
+    handleAutoEmail();
+    handleSendSummaryCountEmail();
   // This should include fetchCases() + fetchSummary()
   };
 
@@ -888,12 +920,12 @@ const fetchAgeBuckets = async () => {
   const validRows = selectedRows.filter(row => Number(row.id) > 0);
   const idsToUpdate = validRows.map(row => Number(row.id));
 
-  const hasAssigned = selectedRows.some(row => row.case_assignment_status === "Assigned");
+  // const hasAssigned = selectedRows.some(row => row.case_assignment_status === "Assigned");
 
-    if (hasAssigned) {
-      alert("One or more selected cases are already assigned. Reassignment is not allowed.");
-      return;
-    }
+  //   if (hasAssigned) {
+  //     alert("One or more selected cases are already assigned. Reassignment is not allowed.");
+  //     return;
+  //   }
 
   if (idsToUpdate.length === 0) {
     alert("Selected cases have invalid IDs.");
@@ -1107,9 +1139,9 @@ const handleReassignAppeals = async () => {
 
     try {
       const response = await axios.post(`${dataApiEmailUrl}ReassignAppeals`, payload);
-      //console.log(`Email sent to ${agent.agent_name}:`, response.data);
+      //console.log(`Email sent to ${agent.agent_name_withId}:`, response.data);
     } catch (error) {
-      //console.error(`Failed to send email to ${agent.agent_name}:`, error.response?.data || error.message);
+      //console.error(`Failed to send email to ${agent.agent_name_withId}:`, error.response?.data || error.message);
     }
   }
 
@@ -1259,7 +1291,7 @@ const handleReassignAppeals = async () => {
               <option>Proclaim</option>
             </select>
             <button onClick={triggerFileDialog} style={{ backgroundColor: "#0071ce", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Upload Excel</button>
-            <a href="/template/Appeals_Pi_Tool_Upload_Template.csv" download style={{ textDecoration: "none" }}>
+           <a href="https://uat-cg-lpi-portal.sagilityhealth.com:8081/api/ExportControllers/appeals_template_download" style={{ textDecoration: "none" }}>
             <button style={{ backgroundColor: "#0071ce", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Download Template</button>
             </a>
         
@@ -1528,7 +1560,7 @@ const handleReassignAppeals = async () => {
                             assigned_PG,
                             unassigned_PG,
 
-                            total_NonComplian_Yes,
+                            total_NonCompliant_Yes,
                             total_PreService,
                             total_PG_Yes
                           } = caseStatusCt;
@@ -1559,7 +1591,7 @@ const handleReassignAppeals = async () => {
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent_NonCompliant}</strong></div>
                                   <div>🚀 Assigned: <strong>{assigned_NonCompliant}</strong></div>
                                   <div>❔ Unassigned: <strong>{unassigned_NonCompliant}</strong></div>
-                                  <div>📊 Total Non-Compliant: <strong>{total_NonComplian_Yes}</strong></div>
+                                  <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
                                 </div>
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
@@ -2223,15 +2255,83 @@ const handleReassignAppeals = async () => {
         Assign {selectedRows.length} {selectedRows.length === 1 ? "Case" : "Cases"}
       </h3>
 
-      <label style={{ fontWeight: "500", marginBottom: "6px", display: "block" }}>
-          Select Agent:
+      {/* Search Input */}
+      <div style={{ marginBottom: "16px" }}>
+        <label style={{ fontWeight: "500", marginBottom: "6px", display: "block" }}>
+          Search Agent:
+        </label>
+        <input
+          type="text"
+          placeholder="Type agent name to search..."
+          value={agentSearchTerm}
+          onChange={(e) => setAgentSearchTerm(e.target.value)}
+          style={{
+            width: "96%",
+            padding: "8px",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+            fontSize: "14px",
+            marginBottom: "8px"
+          }}
+        />
+        
+        {/* Search Results */}
+        {agentSearchTerm && (
+          <div style={{
+            maxHeight: "120px",
+            overflowY: "auto",
+            border: "1px solid #ddd",
+            borderRadius: "6px",
+            backgroundColor: "#fff"
+          }}>
+            {filteredAgents.length > 0 ? (
+              filteredAgents.map((agent) => (
+                <div
+                  key={agent.agent}
+                  onClick={() => {
+                    if (!assignTo.some(a => a.agent === agent.agent)) {
+                      setAssignTo(prev => [...prev, agent]);
+                      setAgentSearchTerm(""); // Clear search after selection
+                    }
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderBottom: "1px solid #eee",
+                    backgroundColor: assignTo.some(a => a.agent === agent.agent) ? "#f0f0f0" : "#fff",
+                    color: assignTo.some(a => a.agent === agent.agent) ? "#999" : "#333"
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = "#f5f5f5"}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = assignTo.some(a => a.agent === agent.agent) ? "#f0f0f0" : "#fff"}
+                >
+                  {agent.agent_name_withId}
+                  {assignTo.some(a => a.agent === agent.agent) && <span style={{ marginLeft: "8px", fontSize: "12px" }}>(Selected)</span>}
+                </div>
+              ))
+            ) : (
+              <div style={{
+                padding: "12px",
+                textAlign: "center",
+                color: "#999",
+                fontStyle: "italic"
+              }}>
+                No agents found matching "{agentSearchTerm}"
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Original Dropdown */}
+      <div style={{ marginBottom: "16px" }}>
+        <label style={{ fontWeight: "500", marginBottom: "6px", display: "block" }}>
+          Or Select from Dropdown:
         </label>
         <select
           value=""
-          //disabled={assignTo.length >= selectedRows.length}
           onChange={(e) => {
             const selectedAgentName = e.target.value;
-            const selectedAgent = agentList.find(a => a.agent_name === selectedAgentName);
+            const selectedAgent = agentList.find(a => a.agent_name_withId === selectedAgentName);
           
             if (selectedAgent && !assignTo.some(a => a.agent === selectedAgent.agent)) {
               setAssignTo(prev => [...prev, selectedAgent]); // ✅ Store object
@@ -2247,7 +2347,7 @@ const handleReassignAppeals = async () => {
         >
           <option value="">-- Select Agent --</option>
           {[...new Set(agentList
-            .map(agent => agent.agent_name)
+            .map(agent => agent.agent_name_withId)
             .filter(name => {
               if (!name) return false;
               const lower = name.toLowerCase();
@@ -2261,6 +2361,7 @@ const handleReassignAppeals = async () => {
             <option key={name} value={name}>{name}</option>
           ))}
         </select>
+      </div>
 
 
       {assignTo.length > 0 && (
@@ -2271,7 +2372,23 @@ const handleReassignAppeals = async () => {
           borderRadius: "6px",
           border: "1px solid #ddd"
         }}>
-          <strong style={{ display: "block", marginBottom: "6px" }}>Selected Agent(s):</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+            <strong>Selected Agent(s):</strong>
+            <button
+              onClick={() => setAssignTo([])}
+              style={{
+                backgroundColor: "#dc3545",
+                color: "white",
+                border: "none",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                fontSize: "12px",
+                cursor: "pointer"
+              }}
+            >
+              Clear All
+            </button>
+          </div>
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {assignTo.map((a, idx) => (
                   <li
@@ -2279,10 +2396,11 @@ const handleReassignAppeals = async () => {
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      alignItems: "center"
+                      alignItems: "center",
+                      padding: "4px 0"
                     }}
                   >
-                    <span>{a.agent_name}</span>
+                    <span>{a.agent_name_withId}</span>
                     <button
                       onClick={() => setAssignTo(assignTo.filter((agent) => agent.agent !== a.agent))}
                       style={{
@@ -2299,7 +2417,6 @@ const handleReassignAppeals = async () => {
                   </li>
                 ))}
               </ul>
-
         </div>
       )}
 
@@ -2327,11 +2444,11 @@ const handleReassignAppeals = async () => {
               };
             });
             handleUpdateAssignedStatus({ status: "Assigned" });
-            handleReassignAppeals();
             setPreserviceRows(updated);
             setSelectedRows([]);
             setAssignTo([]);
             setShowAssignModal(false);
+             handleReassignAppeals();
           }}
           style={{
             backgroundColor: assignTo.length ? "#0071ce" : "#aaa",

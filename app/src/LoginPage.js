@@ -1,59 +1,158 @@
 // LoginPage.js
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { setPocid, getPocid } from './pocConfig';// Import poc from config.js
+import { appealsLoginAPI } from './config';
+import { useUser } from './UserContext';
+import axios from 'axios';
 
 function LoginPage() {
+  const { 
+    login,
+    setAgentId,
+    setTeamLeadId,
+    setClientId,
+    setPocId,
+    user
+  } = useUser();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
   const navigate = useNavigate();
+  const location = useLocation();
 
-const handleLogin = (e) => {
-  e.preventDefault();
+  // If already logged in → redirect to intended page
+  useEffect(() => {
+    if (user && location.state?.from) {
+      navigate(location.state.from.pathname, { replace: true });
+    }
+  }, [user, navigate, location.state]);
 
-  const normalized = username.replace(/\s+/g, ' ').trim();
+  const handleLogin = async (e) => {
+    e.preventDefault();
 
-  const loginState = {
-    managerName: normalized.toLowerCase(),
-    managerNameRaw: normalized
+    const normalized = username.replace(/\s+/g, ' ').trim();
+
+    /* ───────────────────────────────────────────────
+       LEGACY LOGIN (NO PASSWORD)
+    ─────────────────────────────────────────────── */
+    if (password === '') {
+      const loginState = {
+        // managerName: normalized.toLowerCase(),
+        // managerNameRaw: normalized
+      };
+      
+
+      const uname = normalized.toLowerCase();
+
+      if (uname === 'leader') {
+        navigate('/client');
+        return;
+      }
+      if (uname === 'agent') {
+        setAgentId('LEGACY'); // optional
+        navigate('/agent');
+        return;
+      }
+      if (uname === 'poc') {
+        setPocId('M132305');
+        navigate('/poc');
+        return;
+      }
+      if (uname === 'onshore') {
+        setPocId('ONSHORE');
+        navigate('/poc');
+        return;
+      }
+
+      navigate('/teamlead', { state: loginState });
+      return;
+    }
+
+    /* ───────────────────────────────────────────────
+       API LOGIN
+    ─────────────────────────────────────────────── */
+    setIsLoading(true);
+
+    try {
+      const response = await axios.post(
+        `${appealsLoginAPI}appeals_login`,
+        {
+          Username: username,
+          Password: password
+        }
+      );
+
+      if (!response.data) return;
+
+      const userData = response.data;
+
+      console.log('API Response:', userData);
+      const landingPage = (userData.landingPage || '').trim().toLowerCase();
+
+      // store user in global UserContext
+      login(userData);
+
+      console.log('API Response:', userData);
+      // also save old loginState for backwards compatibility
+      const loginState = {
+        // managerName: normalized.toLowerCase(),
+        // managerNameRaw: normalized,
+        userInfo: userData
+      };
+     
+
+      /* ───────────────────────────────────────────────
+         ROLE-BASED ROUTING USING Setters
+      ─────────────────────────────────────────────── */
+
+      // CLIENT
+      if (landingPage === 'client' || landingPage === '/client') {
+        setClientId(userData.agentID || userData.clientID);
+        navigate('/client');
+        return;
+      }
+
+      // AGENT
+      if (landingPage === 'agent' || landingPage === '/agent') {
+        setAgentId(userData.agentID);
+        navigate('/agent');
+        return;
+      }
+
+      // POC
+      if (landingPage === 'poc' || landingPage === '/poc') {
+        setPocId(userData.agentID);
+        navigate('/poc');
+        return;
+      }
+
+      // TEAM LEAD
+      if (landingPage === 'teamlead' || landingPage === '/teamlead') {
+        setTeamLeadId(userData.agentID);
+        navigate('/teamlead', { state: loginState });
+        return;
+      }
+
+      /* ───────────────────────────────────────────────
+         ❌ No fallback. If no landingPage recognized,
+            simply do nothing — stay on login page.
+      ─────────────────────────────────────────────── */
+      console.warn('Unknown landingPage. No redirect performed.');
+
+    } catch (error) {
+      console.error('Login failed:', error);
+      alert(error.response?.status === 401
+        ? 'Invalid credentials'
+        : 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+
   };
 
-  sessionStorage.setItem('loginState', JSON.stringify(loginState));
-
-  if (normalized.toLowerCase() === 'leader' && password === '') {
-    navigate('/client');
-    } else if (username === 'agent' && password === '') {
-  navigate('/agent');
-     } else if (username === 'poc' && password === '') {
-  navigate('/poc');
-  setPocid('M132305');
-  } else if (username === 'Onshore' && password === '') {
-    setPocid(username);
-    navigate('/poc');
-  } else if (password === '') {
-    console.log("Sending login state:", loginState);
-    navigate('/teamlead', { state: loginState });
-  
-  } else {
-    alert('Invalid credentials');
-  }
-};
-
-
-
-
-
-
-  // const handleLogin = (e) => {
-  //   e.preventDefault();
-  //   if (username === 'client' && password === '') {
-  //     navigate('/client');
-  //   } else if (username === 'teamlead' && password === '') {
-  //     navigate('/teamlead');
-  //   } else {
-  //     alert('Invalid credentials');
-  //   }
-  // };
 
   return (
     <div style={{
@@ -145,22 +244,23 @@ const handleLogin = (e) => {
 
             <button
               type="submit"
+              disabled={isLoading}
               style={{
                 width: '100%',
                 padding: '12px',
-                backgroundColor: '#8BC53F',
+                backgroundColor: isLoading ? '#ccc' : '#8BC53F',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
                 fontWeight: 'bold',
                 fontSize: '16px',
-                cursor: 'pointer',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
                 transition: 'background 0.3s ease'
               }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#76a938'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#8BC53F'}
+              onMouseOver={(e) => !isLoading && (e.target.style.backgroundColor = '#76a938')}
+              onMouseOut={(e) => !isLoading && (e.target.style.backgroundColor = '#8BC53F')}
             >
-              Login
+              {isLoading ? 'Logging in...' : 'Login'}
             </button>
           </form>
         </div>
