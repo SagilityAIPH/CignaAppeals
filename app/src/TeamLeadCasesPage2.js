@@ -54,6 +54,7 @@ function TeamLeadCasesPage() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignTo, setAssignTo] = useState([]);
   const [agentList, setAgentList] = useState([]);
+  const [agentSearchTerm, setAgentSearchTerm] = useState("");
   const [ageBucketData, setAgeBucketData] = useState([]);
   const [caseStatusCt, setCaseStatusCt] = useState([]);
   const [caseStatusPerAgent, setCaseStatusPerAgent] = useState([]);
@@ -88,6 +89,24 @@ function TeamLeadCasesPage() {
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
 
   const { teamLeadId } = useUser();
+
+  // Filter agents based on search term (similar to POCPage2.js)
+  const filteredAgents = useMemo(() => {
+    if (!agentSearchTerm) return [];
+    
+    return agentList
+      .filter(agent => {
+        if (!agent.agent_name) return false;
+        const lower = agent.agent_name.toLowerCase();
+        return (
+          !lower.includes("proclaim_queu") &&
+          !lower.includes("queue") &&
+          !lower.startsWith("sagproc") &&
+          lower.includes(agentSearchTerm.toLowerCase())
+        );
+      })
+      .slice(0, 10); // Limit to 10 results for performance
+  }, [agentList, agentSearchTerm]);
 
   const fetchAgeBucketSummary = async () => {
     const teamLeadId_param = teamLeadId;
@@ -388,17 +407,9 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
   };
   
   
-
-  const handleUpdateAssignedStatus = async ({ status }) => {
+    const handleUpdateAssignedStatus = async ({ status }) => {
     const validRows = selectedRows.filter(row => Number(row.id) > 0);
     const idsToUpdate = validRows.map(row => Number(row.id));
-  
-    const hasAssigned = selectedRows.some(row => row.case_assignment_status === "Assigned");
-  
-      if (hasAssigned) {
-        alert("One or more selected cases are already assigned. Reassignment is not allowed.");
-        return;
-      }
   
     if (idsToUpdate.length === 0) {
       alert("Selected cases have invalid IDs.");
@@ -406,93 +417,30 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     }
   
     try {
-      if (!(status === '')) {
-        // ✅ Just update the status (no assignment)
-        try {
-          await axios.post(`${dataApiUrl}appeal_cases_status_update`, {
-            ids: idsToUpdate,
-            status: status,
-            pend_reason: null
-          }, {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-        } catch (error) {
-          console.error("❌ Failed to update status:");
-          
-          if (error.response) {
-            // Server responded with a status outside 2xx
-            console.error("Response status:", error.response.status);
-            console.error("Response data:", error.response.data);
-            console.error("Response headers:", error.response.headers);
-          } else if (error.request) {
-            // Request made but no response received
-            console.error("No response received:", error.request);
-          } else {
-            // Other errors
-            console.error("Error message:", error.message);
-          }
-        
-          alert(`Failed to update case status to ${status}.`);
+      // ✅ Only update status - no assignment logic
+      await axios.post(`${dataApiUrl}appeal_cases_status_update`, {
+        ids: idsToUpdate,
+        status: status,
+        pend_reason: null
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
         }
-      } else {
-        // ✅ Assign to agents in chunks
-        if (!assignTo || assignTo.length === 0) {
-          alert("No agents selected to assign cases.");
-          return;
-        }
-  
-        const chunkSize = Math.ceil(idsToUpdate.length / assignTo.length);
-        const chunkedAssignments = [];
-  
-        for (let i = 0; i < assignTo.length; i++) {
-          const start = i * chunkSize;
-          const end = start + chunkSize;
-          chunkedAssignments.push({
-            agent: assignTo[i],
-            ids: idsToUpdate.slice(start, end)
-          });
-        }
-  
-        for (const assignment of chunkedAssignments) {
-          const { agent, ids } = assignment;
-  
-          if (!ids.length) continue;
-  
-          console.log("Sending assignment update:", {
-            ids,
-            status,
-            CignaID: agent.agent,
-            ownerID: agent.agent,
-            ownerName: agent.agent_name
-          });
-  
-          await axios.post(`${dataApiUrl}appeal_case_assignment_update`, {
-            ids,
-            status,
-            CignaID: agent.agent,
-            sessID: '',
-            ownerID: agent.agent,
-            ownerName: agent.agent_name
-          });
-        }
-      }
-  
+      });
+
       // ✅ After successful update
-      await fetchAgeBucketSummary();       // Optional refresh
+      await fetchAgeBucketSummary();
       setSelectedRows([]);
-      setAssignTo([]);
-  
-      //if (status !== 'FFup Sent') {
-        alert(`Status updated to ${status} successfully.`);
-      //}
-  
+      alert(`Status updated to ${status} successfully.`);
+
     } catch (error) {
       console.error(`Failed to update case status to ${status}:`, error);
       alert(`Failed to update case status to ${status}.`);
     }
   };
+
+
+
 
 const handleReassignAppeals = async () => {
   if (selectedRows.length === 0 || assignTo.length === 0) {
@@ -532,6 +480,70 @@ const handleReassignAppeals = async () => {
   }
  fetchCasesPage(1, pageSize);
 };
+
+
+  const handleAssignCases = async ({status}) => {
+    const validRows = selectedRows.filter(row => Number(row.id) > 0);
+    const idsToUpdate = validRows.map(row => Number(row.id));
+  
+    if (idsToUpdate.length === 0) {
+      alert("Selected cases have invalid IDs.");
+      return;
+    }
+
+    if (!assignTo || assignTo.length === 0) {
+      alert("No agents selected to assign cases.");
+      return;
+    }
+
+    try {
+      const chunkSize = Math.ceil(idsToUpdate.length / assignTo.length);
+      const chunkedAssignments = [];
+
+      for (let i = 0; i < assignTo.length; i++) {
+        const start = i * chunkSize;
+        const end = start + chunkSize;
+        chunkedAssignments.push({
+          agent: assignTo[i],
+          ids: idsToUpdate.slice(start, end)
+        });
+      }
+
+      for (const assignment of chunkedAssignments) {
+        const { agent, ids } = assignment;
+
+        if (!ids.length) continue;
+
+        console.log("Sending assignment update:", {
+          ids,
+          CignaID: agent.agent,
+          ownerID: agent.agent,
+          ownerName: agent.agent_name
+        });
+
+        await axios.post(`${dataApiUrl}appeal_case_assignment_update`, {
+          ids,
+          status: status,
+          CignaID: agent.agent,
+          sessID: '',
+          ownerID: agent.agent,
+          ownerName: agent.agent_name
+        });
+      }
+
+      // Refresh data after successful assignment
+      await fetchCasesPage(currentPage2, pageSize);
+      await fetchAgeBucketSummary();
+      await fetchCaseStatusPerAgent();
+      setSelectedRows([]);
+      setAssignTo([]);
+      alert("Cases assigned successfully!");
+
+    } catch (error) {
+      console.error("Assignment failed:", error);
+      alert("Failed to assign cases. Please try again.");
+    }
+  };
 
 
 const handleSendFollowUpEmails = async () => {
@@ -2284,7 +2296,10 @@ const fetchCaseDetailsById = async (id) => {
  {/* Assign */}
  {showAssignModal && (
   <div
-    onClick={() => setShowAssignModal(false)}
+    onClick={() => {
+      setShowAssignModal(false);
+      setAgentSearchTerm("");
+    }}
     style={{
       position: "fixed",
       top: 0, left: 0, right: 0, bottom: 0,
@@ -2310,8 +2325,77 @@ const fetchCaseDetailsById = async (id) => {
         Assign {selectedRows.length} {selectedRows.length === 1 ? "Case" : "Cases"}
       </h3>
 
-      <label style={{ fontWeight: "500", marginBottom: "6px", display: "block" }}>
-          Select Agent:
+      {/* Search Agent Option */}
+      <div style={{ marginBottom: "16px" }}>
+        <label style={{ fontWeight: "500", marginBottom: "6px", display: "block" }}>
+          🔍 Search Agent:
+        </label>
+        <input
+          type="text"
+          placeholder="Type agent name to search..."
+          value={agentSearchTerm}
+          onChange={(e) => setAgentSearchTerm(e.target.value)}
+          style={{
+            width: "96%",
+            padding: "8px",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+            fontSize: "14px",
+            marginBottom: "8px"
+          }}
+        />
+        
+        {/* Search Results */}
+        {agentSearchTerm && (
+          <div style={{
+            maxHeight: "120px",
+            overflowY: "auto",
+            border: "1px solid #ddd",
+            borderRadius: "6px",
+            backgroundColor: "#fff"
+          }}>
+            {filteredAgents.length > 0 ? (
+              filteredAgents.map((agent) => (
+                <div
+                  key={agent.agent}
+                  onClick={() => {
+                    if (!assignTo.some(a => a.agent === agent.agent)) {
+                      setAssignTo(prev => [...prev, agent]);
+                      setAgentSearchTerm(""); // Clear search after selection
+                    }
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderBottom: "1px solid #eee",
+                    backgroundColor: assignTo.some(a => a.agent === agent.agent) ? "#f0f0f0" : "#fff",
+                    color: assignTo.some(a => a.agent === agent.agent) ? "#999" : "#333"
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = "#f5f5f5"}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = assignTo.some(a => a.agent === agent.agent) ? "#f0f0f0" : "#fff"}
+                >
+                  {agent.agent_name}
+                  {assignTo.some(a => a.agent === agent.agent) && <span style={{ marginLeft: "8px", fontSize: "12px" }}>(Selected)</span>}
+                </div>
+              ))
+            ) : (
+              <div style={{
+                padding: "12px",
+                textAlign: "center",
+                color: "#999",
+                fontStyle: "italic"
+              }}>
+                No agents found matching "{agentSearchTerm}"
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Original Dropdown - Retained */}
+      <div>
+        <label style={{ fontWeight: "500", marginBottom: "6px", display: "block" }}>
+          📋 Or Select from Dropdown:
         </label>
         <select
           value=""
@@ -2348,6 +2432,7 @@ const fetchCaseDetailsById = async (id) => {
             <option key={name} value={name}>{name}</option>
           ))}
         </select>
+      </div>
 
 
       {assignTo.length > 0 && (
@@ -2414,10 +2499,12 @@ const fetchCaseDetailsById = async (id) => {
               };
             });
             handleUpdateAssignedStatus({ status: "Assigned" });
+            handleAssignCases({ status: "Assigned" });
             handleReassignAppeals();
             setPreserviceRows(updated);
             setSelectedRows([]);
             setAssignTo([]);
+            setAgentSearchTerm("");
             setShowAssignModal(false);
           }}
           style={{
@@ -2433,7 +2520,10 @@ const fetchCaseDetailsById = async (id) => {
           Confirm
         </button>
         <button
-          onClick={() => setShowAssignModal(false)}
+          onClick={() => {
+            setShowAssignModal(false);
+            setAgentSearchTerm("");
+          }}
           style={{
             backgroundColor: "#ccc",
             color: "#333",
@@ -2538,179 +2628,7 @@ const fetchCaseDetailsById = async (id) => {
         </div>
       )}
 
-      {showReasonModal && (
-        <div
-          onClick={() => setShowReasonModal(false)}
-          onKeyDown={(e) => e.key === "Escape" && setShowReasonModal(false)}
-          tabIndex={0}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1100,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: "white",
-              borderRadius: "10px",
-              padding: "24px",
-              maxWidth: "400px",
-              width: "90%",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-              textAlign: "center",
-            }}
-          >
-            <h3 style={{ marginBottom: "16px", color: "#003b70" }}>
-              Reason for Pended
-            </h3>
-            <p style={{ fontSize: "14px", marginBottom: "24px" }}>
-              Missing provider documentation.
-            </p>
-            <button
-              onClick={() => setShowReasonModal(false)}
-              style={{
-                backgroundColor: "#003b70",
-                color: "white",
-                border: "none",
-                padding: "8px 16px",
-                borderRadius: "6px",
-                fontWeight: "500",
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showAssignModal && (
-        <div
-          onClick={() => setShowAssignModal(false)}
-          onKeyDown={(e) => e.key === "Escape" && setShowAssignModal(false)}
-          tabIndex={0}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1100,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: "white",
-              borderRadius: "10px",
-              padding: "24px",
-              maxWidth: "400px",
-              width: "90%",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-              textAlign: "center",
-            }}
-          >
-            <h3 style={{ marginBottom: "16px", color: "#003b70" }}>
-              Assign Selected Cases
-            </h3>
-
-            <select
-              value={assignTo}
-              onChange={(e) => setAssignTo(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-                fontSize: "14px",
-                marginBottom: "20px",
-              }}
-            >
-              <option value="">-- Select OwnerName --</option>
-              {[
-                ...new Set(
-                  preserviceRows.map((row) => row["OwnerName"]).filter(Boolean)
-                ),
-              ]
-                .sort()
-                .map((name, i) => (
-                  <option key={i} value={name}>
-                    {name}
-                  </option>
-                ))}
-            </select>
-
-            <div
-              style={{ display: "flex", justifyContent: "center", gap: "16px" }}
-            >
-              <button
-                onClick={() => {
-                  const selectedOwner = preserviceRows.find(
-                    (r) => r["OwnerName"] === assignTo
-                  );
-                  if (!selectedOwner) return;
-
-                  const updated = preserviceRows.map((row) => {
-                    if (selectedRows.some((sel) => sel["SR"] === row["SR"])) {
-                      return {
-                        ...row,
-                        OwnerName: selectedOwner["OwnerName"],
-                        OwnerID: selectedOwner["OwnerID"],
-                        OWNER_HELPER: "ASSIGNED",
-                      };
-                    }
-                    return row;
-                  });
-                  //handleUpdateAssignedStatus({ status: "Assigned" });    
-                  handleReassignAppeals();
-                  setPreserviceRows(updated);
-                  setSelectedRows([]);
-                  setAssignTo("");
-                  setShowAssignModal(false);
-                }}
-                disabled={!assignTo}
-                style={{
-                  backgroundColor: "#0071ce",
-                  color: "white",
-                  border: "none",
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  fontWeight: "600",
-                  cursor: assignTo ? "pointer" : "not-allowed",
-                }}
-              >
-                Confirm
-              </button>
-              <button
-                onClick={() => setShowAssignModal(false)}
-                style={{
-                  backgroundColor: "#ccc",
-                  color: "#333",
-                  border: "none",
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+     
     </div>
   );
 }

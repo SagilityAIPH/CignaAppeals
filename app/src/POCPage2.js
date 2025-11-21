@@ -383,17 +383,6 @@ const toggleRowSelection = (row) => {
 // };
 
 
-
-
-const fetchAgents2 = async () => {
-  try {
-    const response = await axios.get(`${dataApiUrl}appeals_agents_list`);
-    setAgentList(response.data || []);
-  } catch (error) {
-    console.error("Failed to fetch agents", error);
-  }
-};
-
 const fetchAgents = async () => {
   try {
     const response = await axios.get(`${dataApiUrl}appeals_agents_list`);
@@ -565,7 +554,7 @@ const location = useLocation();
   }, [location]);
 
 useEffect(() => {
-  fetchAgents();
+ 
     fetchAgeBuckets()
     fetchCasesPage(1, pageSize)
     fetchCaseStatusCt()
@@ -573,11 +562,11 @@ useEffect(() => {
 }, []);
 
 
-useEffect(() => {
-  if (departmentList.length > 0) {
-    fetchAgents();
-  }
-}, [departmentList]);
+// useEffect(() => {
+//   if (departmentList.length > 0) {
+//     fetchAgents();
+//   }
+// }, [departmentList]);
   
 useEffect(() => {
   if (startHideUploadPanelTimer) {
@@ -1253,15 +1242,6 @@ const handleReassignAppeals = async () => {
   const View = async () => {
     try {
       const response = await axios.get(serverAPI + '/api/AppealsIssue/cases_view_per_sr/');
-      console.log('Server Response:', response.data);
-    } catch (error) {
-      console.error('API Error:', error);
-    }
-  };
-  const agentRoster = async () => {
-    const payload = "string"
-    try {
-      const response = await axios.get(serverAPI + '/api/AppealsIssue/appeals_agents_list' + payload);
       console.log('Server Response:', response.data);
     } catch (error) {
       console.error('API Error:', error);
