@@ -92,7 +92,7 @@ const getColorForBucket = (index) => {
 function POCPage() {
   const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedReport, setSelectedReport] = useState("Appeals Inventory Report");
+  const [selectedReport, setSelectedReport] = useState("All");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -139,7 +139,34 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   const [ageSummary, setAgeSummary] = useState([]);
   const [caseStatusCt, setCaseStatusCt] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [refreshing, setRefreshing] = useState(false);
   const { pocId } = useUser();
+
+  // Helper functions for agent name formatting and sorting
+  const formatAgentName = (agentName) => {
+    if (!agentName) return '';
+    
+    // Extract ID and name from format like "FirstName LastName (ID)" or "(ID) FirstName LastName"
+    const idMatch = agentName.match(/\(([^)]+)\)/);
+    const id = idMatch ? idMatch[1] : '';
+    
+    // Remove ID from the string to get just the name
+    const nameOnly = agentName.replace(/\s*\([^)]+\)\s*/g, '').trim();
+    
+    // Return in format "(ID) FirstName LastName"
+    return id ? `(${id}) ${nameOnly}` : nameOnly;
+  };
+
+  const getFirstName = (agentName) => {
+    if (!agentName) return '';
+    
+    // Remove ID from the string to get just the name
+    const nameOnly = agentName.replace(/\s*\([^)]+\)\s*/g, '').trim();
+    
+    // Get first name (first word)
+    const firstName = nameOnly.split(' ')[0];
+    return firstName || '';
+  };
 
   // Filter agents based on search term
   const filteredAgents = useMemo(() => {
@@ -155,6 +182,11 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
           !lower.startsWith("sagproc") &&
           lower.includes(agentSearchTerm.toLowerCase())
         );
+      })
+      .sort((a, b) => {
+        const firstNameA = getFirstName(a.agent_name_withId);
+        const firstNameB = getFirstName(b.agent_name_withId);
+        return firstNameA.localeCompare(firstNameB, undefined, { sensitivity: 'base' });
       })
       .slice(0, 10); // Limit to 10 results for performance
   }, [agentList, agentSearchTerm]);
@@ -319,6 +351,16 @@ if (caseStatusFilter === "Pended") {
     );
     return (row[key] || "").trim().toUpperCase();
   }; 
+
+  // Helper function to convert selectedReport to claim_system parameter
+  const getClaimSystemParam = () => {
+    switch (selectedReport) {
+      case 'All': return '';
+      case 'Facets': return 'Facets';
+      case 'Proclaim': return 'Proclaim';
+      default: return '';
+    }
+  };
 
   const formatExcelDate = (value) => {
     if (typeof value === 'number') {
@@ -507,6 +549,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
         poc: pocId,
         caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
         assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
+        claim_system: getClaimSystemParam(),
         ...prioritizationPayload
       }
     );
@@ -536,11 +579,11 @@ useEffect(() => {
   fetchCasesPage(1, pageSize)
   fetchAgeBuckets();
   fetchCaseStatusCt();
-}, [caseStatusFilter, assignmentFilter, prioritizationFilter]);
+}, [caseStatusFilter, assignmentFilter, prioritizationFilter, selectedReport]);
 
 useEffect(() => {
   fetchCasesPage(currentPage, pageSize);
-}, [currentPage, pageSize]);
+}, [currentPage, pageSize, selectedReport]);
 
 const location = useLocation();
 
@@ -559,7 +602,7 @@ useEffect(() => {
     fetchCasesPage(1, pageSize)
     fetchCaseStatusCt()
     setUploadComplete(true); // Reset upload state on mount
-}, []);
+}, [selectedReport]);
 
 
 // useEffect(() => {
@@ -620,7 +663,7 @@ const fetchCaseStatusCt = async () => {
 let poc = pocId
   try {
     const res = await axios.get(`${dataApiUrl}get_cases_status_ct_poc`, {
-      params: { poc }
+      params: { poc, claim_system: getClaimSystemParam() }
     });
 
     if (res.data) {
@@ -639,13 +682,36 @@ let poc = pocId
 // }, [showAssignModal, showFollowUpModal]);
       
 const handleRefresh = async () => {
-  //window.location.reload();
-  //handleSendSummaryCountEmail();
-  fetchCasesPage(1, pageSize)
-         fetchAgeBuckets();
-         setAssignmentFilter("All");
-         setCaseStatusFilter("All");
-         setPageSize(10); 
+
+    setRefreshing(true);
+  try {
+    // Reset all state to initial values
+    setAssignmentFilter("All");
+    setCaseStatusFilter("All");
+    setPrioritizationFilter("");
+    setCurrentPage(1);
+    setPageSize(10);
+    setSelectedRows([]);
+    setAssignTo([]);
+    setAgentSearchTerm("");
+    setSortConfig({ key: null, direction: 'asc' });
+    
+    // Fetch all fresh data in parallel
+    await Promise.all([
+      fetchCasesPage(1, 10),
+      fetchAgeBuckets(),
+      fetchCaseStatusCt()
+    ]);
+    
+    console.log("Data refreshed successfully");
+    
+  } catch (error) {
+    console.error("Error refreshing data:", error);
+    // Optional: Add user notification
+  } finally {
+
+     setRefreshing(false);
+  }
 };
 
 const handleAutoEmail = async () => {
@@ -744,7 +810,9 @@ const fetchCaseDetailsById = async (id) => {
 const fetchAgeBuckets = async () => {
 
   try {
-    const res = await axios.get(`${dataApiUrl}get_age_bucket_poc?poc=${pocId}`);
+    const res = await axios.get(`${dataApiUrl}get_age_bucket_poc`, {
+      params: { poc: pocId, claim_system: getClaimSystemParam() }
+    });
     const data = res.data || [];
 
     // For filtering
@@ -1268,6 +1336,8 @@ const handleReassignAppeals = async () => {
             <label htmlFor="reportSelect" style={{ fontWeight: 600 }}>Choose report:</label>
             <select id="reportSelect" value={selectedReport} onChange={(e) => setSelectedReport(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 14 }}>
               {/* <option>Facets</option> */}
+              <option>All</option>
+              <option>Facets</option>
               <option>Proclaim</option>
             </select>
             <button onClick={triggerFileDialog} style={{ backgroundColor: "#0071ce", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Upload Excel</button>
@@ -1278,7 +1348,21 @@ const handleReassignAppeals = async () => {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           {/* <button onClick={handleAutoEmail} style={{ backgroundColor: "#00aaff", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Auto email</button> */}
-          <button onClick={handleRefresh} style={{ backgroundColor: "#00aaff", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Refresh</button>
+        <button 
+          onClick={handleRefresh} 
+          disabled={refreshing}
+          style={{ 
+            backgroundColor: refreshing ? "#aaa" : "#00aaff", 
+            color: "white", 
+            padding: "10px 18px", 
+            border: "none", 
+            borderRadius: 6, 
+            fontWeight: 600, 
+            cursor: refreshing ? "not-allowed" : "pointer" 
+          }}
+        >
+          {refreshing ? "Refreshing..." : "Refresh"}
+        </button>
           <button   onClick={handleExtractExcel} style={{ backgroundColor: "#217346", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Extract Excel</button>
           </div>
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleFileSelect} />
@@ -2284,7 +2368,7 @@ const handleReassignAppeals = async () => {
                   onMouseEnter={(e) => e.target.style.backgroundColor = "#f5f5f5"}
                   onMouseLeave={(e) => e.target.style.backgroundColor = assignTo.some(a => a.agent === agent.agent) ? "#f0f0f0" : "#fff"}
                 >
-                  {agent.agent_name_withId}
+                  {formatAgentName(agent.agent_name_withId)}
                   {assignTo.some(a => a.agent === agent.agent) && <span style={{ marginLeft: "8px", fontSize: "12px" }}>(Selected)</span>}
                 </div>
               ))
@@ -2310,8 +2394,9 @@ const handleReassignAppeals = async () => {
         <select
           value=""
           onChange={(e) => {
-            const selectedAgentName = e.target.value;
-            const selectedAgent = agentList.find(a => a.agent_name_withId === selectedAgentName);
+            const selectedFormattedName = e.target.value;
+            // Find the agent by comparing the formatted name
+            const selectedAgent = agentList.find(a => formatAgentName(a.agent_name_withId) === selectedFormattedName);
           
             if (selectedAgent && !assignTo.some(a => a.agent === selectedAgent.agent)) {
               setAssignTo(prev => [...prev, selectedAgent]); // ✅ Store object
@@ -2327,18 +2412,23 @@ const handleReassignAppeals = async () => {
         >
           <option value="">-- Select Agent --</option>
           {[...new Set(agentList
-            .map(agent => agent.agent_name_withId)
-            .filter(name => {
-              if (!name) return false;
-              const lower = name.toLowerCase();
+            .filter(agent => {
+              if (!agent.agent_name_withId) return false;
+              const lower = agent.agent_name_withId.toLowerCase();
               return (
                 !lower.includes("proclaim_queu") &&
                 !lower.includes("queue") &&
                 !lower.startsWith("sagproc")
               );
             })
-          )].sort().map((name) => (
-            <option key={name} value={name}>{name}</option>
+            .sort((a, b) => {
+              const firstNameA = getFirstName(a.agent_name_withId);
+              const firstNameB = getFirstName(b.agent_name_withId);
+              return firstNameA.localeCompare(firstNameB, undefined, { sensitivity: 'base' });
+            })
+            .map(agent => formatAgentName(agent.agent_name_withId))
+          )].map((formattedName) => (
+            <option key={formattedName} value={formattedName}>{formattedName}</option>
           ))}
         </select>
       </div>
@@ -2380,7 +2470,7 @@ const handleReassignAppeals = async () => {
                       padding: "4px 0"
                     }}
                   >
-                    <span>{a.agent_name_withId}</span>
+                    <span>{formatAgentName(a.agent_name_withId)}</span>
                     <button
                       onClick={() => setAssignTo(assignTo.filter((agent) => agent.agent !== a.agent))}
                       style={{
