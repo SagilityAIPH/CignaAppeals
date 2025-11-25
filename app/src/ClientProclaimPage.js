@@ -46,6 +46,9 @@ function ClientProclaimPage() {
 
     const [pendedSort, setPendedSort] = useState({ key: 'Total', direction: 'desc' });
     const [memberProviderSummary, setMemberProviderSummary] = useState([]);
+    
+    // Claim system parameter for dashboard APIs
+    const claimSystem = 'Proclaim';
     const [summaryData, setSummaryData] = useState([]);
     const [memberProvider, setMemberProvider] = useState([]);
     const [outOfComplianceView, setOutOfComplianceView] = useState("Daily");
@@ -217,16 +220,16 @@ const fetchPgYesRows = async (gsp, page, size) => {
 
 function fetchComplianceRawData(){
   // Fetch only once
-  axios.get(`${dataApiUrl}get_proclaim_out_of_compliance_ct`, {
-    params: { account: 'Onshore' }
+  axios.post(`${dataApiUrl}get_dashboard_out_of_compliance_ct`, {}, {
+    params: { account: 'Onshore', claim_system: claimSystem }
   }).then(res => setComplianceRawData(res.data))
     .catch(err => console.error("Error fetching compliance data:", err));
 }
 
   const fetchNonAsoStats2 = async () => {
      try {
-    const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
-      params: { director: selectedDirector === 'All' ? '' : selectedDirector }
+    const res = await axios.post(`${dataApiUrl}get_dashboard_non_aso_ct`, {
+      params: { director: selectedDirector === 'All' ? '' : selectedDirector, claim_system: claimSystem }
     });
     setNonAsoStats(res.data || []);
     // Only allow Sagility, Concentrix, Onshore
@@ -360,8 +363,8 @@ useEffect(() => {
 
   const fetchNonAsoStats = async () => {
     try {
-      const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
-        params: { director: selectedDirector === 'All' ? 'Sagility' : selectedDirector }
+      const res = await axios.post(`${dataApiUrl}get_dashboard_non_aso_ct`, {
+        params: { director: selectedDirector === 'All' ? 'Sagility' : selectedDirector, claim_system: claimSystem }
       });
       setNonAsoStats(res.data || []);
     } catch (err) {
@@ -374,7 +377,9 @@ useEffect(() => {
 
     const fetchProclaimStatusGraph = async () => {
         try {
-          const res = await axios.get(`${dataApiUrl}get_proclaim_status_ct`);
+          const res = await axios.post(`${dataApiUrl}get_dashboard_status_ct`, {
+            params: { claim_system: claimSystem }
+          });
           const filtered = res.data.filter(x => x.Account !== 'Total');
           const mapped = filtered.map(item => ({
             date: new Date(item.upload_Date).toLocaleDateString('en-CA'),
@@ -397,25 +402,37 @@ useEffect(() => {
 }, [selectedPgSummaryGsp]);
 
 const fetchPgNameSummary = async () => {
-    try {
-      // Use selectedPgSummaryGsp or default to 'All'
-      const account = selectedPgSummaryGsp === 'All' ? '' : selectedPgSummaryGsp;
-      const res = await axios.get(`${dataApiUrl}get_proclaim_pg_names_ct`, {
-        params: { account }
-      });
-      setPgNameSummary(res.data || []);
-    } catch (error) {
-      setPgNameSummary([]);
-      console.error("Error fetching PG name summary:", error);
-    }
-  };
+  try {
+    // ✅ Use the current filter value
+    const account = selectedPgSummaryGsp === 'All' ? '' : selectedPgSummaryGsp;
+    const res = await axios.post(`${dataApiUrl}get_dashboard_pg_names_ct`, {
+      params: { account, claim_system: claimSystem }
+    });
+    
+    
+    setPgNameSummary(res.data || []);
+  } catch (error) {
+   
+    setPgNameSummary([]);
+  }
+};
+
+const pgNameAccounts = useMemo(() => {
+  return [...new Set(pgNameSummary.map(row => row.account))].sort();
+}, [pgNameSummary]);
+
+const filteredPgNames = useMemo(() => {
+  return pgNameSummary
+    .filter(row => selectedPgSummaryGsp === 'All' || row.account === selectedPgSummaryGsp)
+    .sort((a, b) => b.pG_Count - a.pG_Count);
+}, [pgNameSummary, selectedPgSummaryGsp]);
 
 
       const fetchNonAsoSummary = async () => {
         try {
           const gsp = 'Onshore';
-          const res = await axios.get(`${dataApiUrl}get_proclaim_non_aso_ct`, {
-            params: { direcotr: gsp }
+          const res = await axios.post(`${dataApiUrl}get_dashboard_non_aso_ct`, {
+            params: { direcotr: gsp, claim_system: claimSystem }
           });
          
         } catch (error) {
@@ -427,7 +444,9 @@ const fetchPgNameSummary = async () => {
 
     const fetchProclaimSummary = async () => {
       try {
-        const response = await axios.get(`${dataApiUrl}get_proclaim_summary`);
+        const response = await axios.post(`${dataApiUrl}get_dashboard_summary`, {
+          params: { claim_system: claimSystem }
+        });
         const data = response.data;
     
         setSummaryData(data);
@@ -443,11 +462,11 @@ const fetchPgNameSummary = async () => {
           new Date(row.upload_Date).toISOString().split('T')[0] === latestDate.toISOString().split('T')[0]
         );
     
-        // Aggregate total_Proclaim_Records per account
+        // Aggregate total_dashboard_Records per account
         const counts = latestRows.reduce((acc, row) => {
           const account = row.account?.trim();
           if (account === "Sagility" || account === "Concentrix" || account === "Wipro") {
-            acc[account] = (acc[account] || 0) + row.total_Proclaim_Records;
+            acc[account] = (acc[account] || 0) + row.total_dashboard_Records;
           }
           return acc;
         }, {});
@@ -471,8 +490,8 @@ const fetchPgNameSummary = async () => {
       const account = 'Sagility';
 
       try {
-        const response = await axios.get(`${dataApiUrl}get_proclaim_pend_reason_ct`, {
-          params: { selectedPendedGsp }
+        const response = await axios.post(`${dataApiUrl}get_dashboard_pend_reason_ct`, {
+          params: { selectedPendedGsp, claim_system: claimSystem }
         });
 
         setPendedReason(response.data);
@@ -489,8 +508,8 @@ const fetchPgNameSummary = async () => {
       try {
         const selectedPendedGsp = selectedGsp === "All" ? "" : selectedGsp;
       
-        const response = await axios.get(`${dataApiUrl}get_proclaim_mbr_prov_ct`, {
-          params:  { account: selectedPendedGsp }  
+        const response = await axios.post(`${dataApiUrl}get_dashboard_mbr_prov_ct`, {
+          params:  { account: selectedPendedGsp, claim_system: claimSystem }  
         });
       
         const data = response.data;
@@ -690,8 +709,8 @@ const fetchPgNameSummary = async () => {
   const gsp = "Sagility";
 
   try {
-    const { data } = await axios.get(`${dataApiUrl}get_proclaim_pg_names_ct`, {
-      params: { account: gsp },
+    const { data } = await axios.get(`${dataApiUrl}get_dashboard_pg_names_ct`, {
+      params: { account: gsp, claim_system: claimSystem },
     });
 
     // You can handle `data` here
@@ -727,8 +746,8 @@ const latestDateCounts2 = proclaimLatestDate
 
 
   const latestProclaimCounts = summaryData.reduce((acc, row) => {
-    if (row.account === "Sagility") acc.Sagility = row.total_Proclaim_Records;
-    else if (row.account === "Concentrix") acc.Concentrix = row.total_Proclaim_Records;
+    if (row.account === "Sagility") acc.Sagility = row.total_dashboard_Records;
+    else if (row.account === "Concentrix") acc.Concentrix = row.total_dashboard_Records;
     return acc;
   }, { Sagility: 0, Concentrix: 0 });
   
@@ -2047,10 +2066,10 @@ const sortIcon = (col) => {
           backgroundColor: '#fff',
         }}
       >
-        <option value="All">All</option>
-        {[...new Set(pgNameSummary.map(row => row.account))].map(gsp => (
-          <option key={gsp} value={gsp}>{gsp}</option>
-        ))}
+     <option value="All">All</option>
+      {pgNameAccounts.map(gsp => (
+        <option key={gsp} value={gsp}>{gsp}</option>
+      ))}
       </select>
     </div>
 
@@ -2086,12 +2105,11 @@ const sortIcon = (col) => {
         listStyleType: 'disc',
         whiteSpace: 'normal',
       }}>
-        {pgNameSummary
-          .filter(row => selectedPgSummaryGsp === 'All' || row.account === selectedPgSummaryGsp)
-          .sort((a, b) => b.pG_Count - a.pG_Count)
-          .map(row => (
-            <li key={row.account + row.pG_NAME3}>{row.pG_NAME3}: {row.pG_Count}</li>
-          ))}
+     {filteredPgNames.map((row, index) => (
+    <li key={`pgName_${row.account}_${row.pG_NAME3}_${index}`}>
+      {row.pG_NAME3}: {row.pG_Count}
+    </li>
+  ))}
       </ul>
     </div>
   </div>

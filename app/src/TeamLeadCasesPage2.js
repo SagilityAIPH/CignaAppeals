@@ -96,14 +96,45 @@ function TeamLeadCasesPage() {
     
     return agentList
       .filter(agent => {
-        if (!agent.agent_name) return false;
-        const lower = agent.agent_name.toLowerCase();
+        if (!agent.agent_name_withId) return false;
+        const lower = agent.agent_name_withId.toLowerCase();
         return (
           !lower.includes("proclaim_queu") &&
           !lower.includes("queue") &&
           !lower.startsWith("sagproc") &&
           lower.includes(agentSearchTerm.toLowerCase())
         );
+      })
+      .sort((a, b) => {
+        // Extract first name for sorting
+        const getFirstName = (agent) => {
+          const fullName = agent.agent_name_withId || '';
+          // Check if it's already in "(CODE) NAME" format or "NAME (CODE)" format
+          let nameAfterCode = '';
+          
+          // Try "(CODE) NAME" format first
+          let match = fullName.match(/^\([^)]+\)\s*(.+)$/);
+          if (match) {
+            nameAfterCode = match[1].trim();
+          } else {
+            // Try "NAME (CODE)" format
+            match = fullName.match(/^(.+?)\s*\(([^)]+)\)$/);
+            if (match) {
+              nameAfterCode = match[1].trim();
+            } else {
+              return fullName.toLowerCase();
+            }
+          }
+          
+          // Get the first word (first name)
+          const firstName = nameAfterCode.split(' ')[0];
+          return firstName.toLowerCase();
+        };
+        
+        const firstNameA = getFirstName(a);
+        const firstNameB = getFirstName(b);
+        
+        return firstNameA.localeCompare(firstNameB);
       })
       .slice(0, 10); // Limit to 10 results for performance
   }, [agentList, agentSearchTerm]);
@@ -391,8 +422,13 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
 
 
   const fetchAgents = async () => {
+
+    const teamLeadId_param = teamLeadId;
+
     try {
-      const response = await axios.get(`${dataApiUrl}appeals_agents_list`);
+      const response = await axios.get(`${dataApiUrl}appeals_agents_list_per_teamlead`  , {
+        params: { teamlead_id: teamLeadId_param }
+      });
       const agents = response.data || [];
   
       // Filter agents whose account matches any of the values in departmentList
@@ -431,7 +467,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       // ✅ After successful update
       await fetchAgeBucketSummary();
       setSelectedRows([]);
-      alert(`Status updated to ${status} successfully.`);
+      //alert(`Status updated to ${status} successfully.`);
 
     } catch (error) {
       console.error(`Failed to update case status to ${status}:`, error);
@@ -1642,7 +1678,7 @@ const fetchCaseDetailsById = async (id) => {
                 <tbody>
                   {caseStatusPerAgent.map((agent, idx) => (
                     <tr
-                      key={agent.ownerID}
+                      key={`caseStatusAgent_${idx}`}
                       style={{
                         backgroundColor: idx % 2 === 0 ? "#ffffff" : "#f9fbff",
                       }}
@@ -1839,7 +1875,7 @@ const fetchCaseDetailsById = async (id) => {
             <div style={{ display: "flex", gap: "12px" }}>
               <button
                 onClick={() => {setShowAssignModal(true)
-
+                   fetchAgents();
                   console.log('Reassign trigger')
                 }
                 }
@@ -2355,9 +2391,9 @@ const fetchCaseDetailsById = async (id) => {
             backgroundColor: "#fff"
           }}>
             {filteredAgents.length > 0 ? (
-              filteredAgents.map((agent) => (
+              filteredAgents.map((agent, index) => (
                 <div
-                  key={agent.agent}
+                  key={`${agent.agent || ''}_${agent.agent_name || ''}_search_${index}`}
                   onClick={() => {
                     if (!assignTo.some(a => a.agent === agent.agent)) {
                       setAssignTo(prev => [...prev, agent]);
@@ -2374,7 +2410,17 @@ const fetchCaseDetailsById = async (id) => {
                   onMouseEnter={(e) => e.target.style.backgroundColor = "#f5f5f5"}
                   onMouseLeave={(e) => e.target.style.backgroundColor = assignTo.some(a => a.agent === agent.agent) ? "#f0f0f0" : "#fff"}
                 >
-                  {agent.agent_name}
+                  {(() => {
+                    // Convert "Name (ID)" to "(ID) Name" for display
+                    const fullName = agent.agent_name_withId;
+                    const match = fullName.match(/^(.+?)\s*\(([^)]+)\)$/);
+                    if (match) {
+                      const agentName = match[1].trim();
+                      const agentId = match[2].trim();
+                      return `(${agentId}) ${agentName}`;
+                    }
+                    return fullName;
+                  })()}
                   {assignTo.some(a => a.agent === agent.agent) && <span style={{ marginLeft: "8px", fontSize: "12px" }}>(Selected)</span>}
                 </div>
               ))
@@ -2402,9 +2448,9 @@ const fetchCaseDetailsById = async (id) => {
           //disabled={assignTo.length >= selectedRows.length}
           onChange={(e) => {
             const selectedAgentName = e.target.value;
-            const selectedAgent = agentList.find(a => a.agent_name === selectedAgentName);
+            const selectedAgent = agentList.find(a => a.agent_name_withId === selectedAgentName);
           
-            if (selectedAgent && !assignTo.some(a => a.agent === selectedAgent.agent)) {
+            if (selectedAgent && !assignTo.some(a => a.agent_name_withId === selectedAgent.agent_name_withId)) {
               setAssignTo(prev => [...prev, selectedAgent]); // ✅ Store object
             }
           }}
@@ -2417,9 +2463,9 @@ const fetchCaseDetailsById = async (id) => {
           }}
         >
           <option value="">-- Select Agent --</option>
-          {[...new Set(agentList
-            .map(agent => agent.agent_name)
-            .filter(name => {
+          {agentList
+            .filter(agent => {
+              const name = agent.agent_name_withId;
               if (!name) return false;
               const lower = name.toLowerCase();
               return (
@@ -2428,9 +2474,57 @@ const fetchCaseDetailsById = async (id) => {
                 !lower.startsWith("sagproc")
               );
             })
-          )].sort().map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
+            .reduce((unique, agent) => {
+              // Remove duplicates based on agent_name_withId
+              if (!unique.find(a => a.agent_name_withId === agent.agent_name_withId)) {
+                unique.push(agent);
+              }
+              return unique;
+            }, [])
+            .sort((a, b) => {
+              // Extract first name for sorting
+              const getFirstName = (agent) => {
+                const fullName = agent.agent_name_withId;
+                console.log("Original fullName:", fullName); // Debug log
+                
+                // Check if it's already in "(CODE) NAME" format or "NAME (CODE)" format
+                let nameAfterCode = '';
+                
+                // Try "(CODE) NAME" format first
+                let match = fullName.match(/^\([^)]+\)\s*(.+)$/);
+                if (match) {
+                  nameAfterCode = match[1].trim();
+                } else {
+                  // Try "NAME (CODE)" format
+                  match = fullName.match(/^(.+?)\s*\(([^)]+)\)$/);
+                  if (match) {
+                    nameAfterCode = match[1].trim();
+                  } else {
+                    return fullName.toLowerCase();
+                  }
+                }
+                
+                // Get the first word (first name)
+                const firstName = nameAfterCode.split(' ')[0];
+                console.log("Extracted firstName:", firstName); // Debug log
+                return firstName.toLowerCase();
+              };
+              
+              const firstNameA = getFirstName(a);
+              const firstNameB = getFirstName(b);
+              
+              return firstNameA.localeCompare(firstNameB);
+            })
+            .map((agent, index) => {
+              const name = agent.agent_name_withId;
+
+              
+              // Use a combination of agent properties to create unique key
+              const uniqueKey = `${agent.agent || ''}_${agent.agent_name || ''}_${index}`;
+              
+              // Temporarily show original format to debug
+              return <option key={uniqueKey} value={name}>{name}</option>;
+            })}
         </select>
       </div>
 
@@ -2447,14 +2541,24 @@ const fetchCaseDetailsById = async (id) => {
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {assignTo.map((a, idx) => (
                   <li
-                    key={a.agent} // Or any unique ID
+                    key={`${a.agent || ''}_${a.agent_name || ''}_selected_${idx}`}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center"
                     }}
                   >
-                    <span>{a.agent_name}</span>
+                    <span>{(() => {
+                      // Convert "Name (ID)" to "(ID) Name" for display
+                      const fullName = a.agent_name_withId;
+                      const match = fullName.match(/^(.+?)\s*\(([^)]+)\)$/);
+                      if (match) {
+                        const agentName = match[1].trim();
+                        const agentId = match[2].trim();
+                        return `(${agentId}) ${agentName}`;
+                      }
+                      return fullName;
+                    })()}</span>
                     <button
                       onClick={() => setAssignTo(assignTo.filter((agent) => agent.agent !== a.agent))}
                       style={{
