@@ -16,7 +16,7 @@ export const UserProvider = ({ children }) => {
   const [teamLeadId, setTeamLeadId] = useState(null);
   const [clientId, setClientId] = useState(null);
   const [pocId, setPocId] = useState(null);
-
+  const [account, setAccount] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -39,6 +39,7 @@ export const UserProvider = ({ children }) => {
         setTeamLeadId(parsed.teamLeadId || null);
         setClientId(parsed.clientId || null);
         setPocId(parsed.pocId || null);
+        setAccount(parsed.account || null);
       } catch {
         sessionStorage.removeItem("roleIds");
       }
@@ -57,6 +58,7 @@ export const UserProvider = ({ children }) => {
         teamLeadId,
         clientId,
         pocId,
+        account,
         ...ids,
       })
     );
@@ -68,13 +70,20 @@ export const UserProvider = ({ children }) => {
     agentID: (userData.agentID || '').trim(), 
     fullName: userData.fullName || '',   // <-- FIXED
     role: userData.role || '',
-    landingPage: userData.landingPage || ''
+    landingPage: userData.landingPage || '',
+    account: userData.account || '' // Add account field from login response
   };
 
   console.log("Saving user to session:", userObj);
 
   setUser(userObj);
   sessionStorage.setItem('currentUser', JSON.stringify(userObj));
+  
+  // Also set the account in the UserContext state
+  if (userData.account) {
+    console.log("Setting account from login data:", userData.account);
+    setAccount(userData.account);
+  }
 };
   const logout = () => {
     setUser(null);
@@ -100,6 +109,7 @@ export const UserProvider = ({ children }) => {
     teamLeadId,
     clientId,
     pocId,
+    account, // Add account to the exposed values
 
     // Setters (with sessionStorage sync)
     setAgentId: (id) => {
@@ -117,6 +127,10 @@ export const UserProvider = ({ children }) => {
     setPocId: (id) => {
       setPocId(id);
       saveRoleIdsToSession({ pocId: id });
+    },
+    setAccount: (acc) => { // Add setAccount function
+      setAccount(acc);
+      saveRoleIdsToSession({ account: acc });
     },
   };
 

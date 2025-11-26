@@ -93,6 +93,7 @@ function POCPage() {
   const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedReport, setSelectedReport] = useState("All");
+  const [selectedGsp, setSelectedGsp] = useState("All");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -140,7 +141,12 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   const [caseStatusCt, setCaseStatusCt] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [refreshing, setRefreshing] = useState(false);
-  const { pocId } = useUser();
+  const { pocId, account } = useUser();
+
+  // Debug: Log the account value from UserContext
+  useEffect(() => {
+    console.log('POCPage2 - Account from UserContext:', account);
+  }, [account]);
 
   // Helper functions for agent name formatting and sorting
   const formatAgentName = (agentName) => {
@@ -362,6 +368,57 @@ if (caseStatusFilter === "Pended") {
     }
   };
 
+  // Helper function to convert selectedGsp to account parameter
+  const getAccountParam = () => {
+    switch (selectedGsp) {
+      case 'All': return '';
+      case 'Sagility': return 'Sagility';
+      case 'Concentrix': return 'Concentrix';
+      case 'Wipro': return 'Wipro';
+      default: return '';
+    }
+  };
+
+  // Helper functions to filter dropdown options based on user account
+  const getAvailableReportOptions = useCallback(() => {
+  
+    if (!account) return ['All', 'Proclaim', 'Facets']; // Default if no account
+    
+    switch (account.toLowerCase()) {
+      case 'concentrix':
+       
+        return ['Proclaim']; // Concentrix users only see Proclaim
+      case 'sagility':
+     
+        return ['All', 'Proclaim', 'Facets']; // Sagility users see all options
+      default:
+       
+        return ['All', 'Proclaim', 'Facets']; // Default all options
+    }
+  }, [account]);
+
+  const getAvailableGspOptions = useCallback(() => {
+
+    if (!account) return ['All', 'Concentrix', 'Sagility']; // Default if no account
+    
+    switch (account.toLowerCase()) {
+      case 'concentrix':
+      
+        return ['Concentrix']; // Concentrix users only see Concentrix
+      case 'sagility':
+       
+        return ['All', 'Concentrix', 'Sagility']; // Sagility users see all options
+      default:
+        
+        return ['All', 'Concentrix', 'Sagility']; // Default all options
+    }
+  }, [account]);
+
+  // Helper function to determine if dropdowns should be disabled
+  const isDropdownDisabled = useCallback(() => {
+    return account && account.toLowerCase() === 'concentrix';
+  }, [account]);
+
   const formatExcelDate = (value) => {
     if (typeof value === 'number') {
       const jsDate = new Date(Math.round((value - 25569) * 86400 * 1000));
@@ -550,6 +607,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
         caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
         assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
         claim_system: getClaimSystemParam(),
+        account: getAccountParam(),
         ...prioritizationPayload
       }
     );
@@ -579,11 +637,11 @@ useEffect(() => {
   fetchCasesPage(1, pageSize)
   fetchAgeBuckets();
   fetchCaseStatusCt();
-}, [caseStatusFilter, assignmentFilter, prioritizationFilter, selectedReport]);
+}, [caseStatusFilter, assignmentFilter, prioritizationFilter, selectedReport, selectedGsp]);
 
 useEffect(() => {
   fetchCasesPage(currentPage, pageSize);
-}, [currentPage, pageSize, selectedReport]);
+}, [currentPage, pageSize, selectedReport, selectedGsp]);
 
 const location = useLocation();
 
@@ -602,7 +660,26 @@ useEffect(() => {
     fetchCasesPage(1, pageSize)
     fetchCaseStatusCt()
     setUploadComplete(true); // Reset upload state on mount
-}, [selectedReport]);
+}, [selectedReport, selectedGsp]);
+
+// Set default dropdown values based on user account
+useEffect(() => {
+  console.log('useEffect for account defaults triggered. Account:', account);
+  if (account) {
+    // Set defaults based on account type
+    if (account.toLowerCase() === 'concentrix') {
+      console.log('Setting Concentrix defaults: Proclaim, Concentrix');
+      // Concentrix users: force to their only options
+      setSelectedReport('Proclaim');
+      setSelectedGsp('Concentrix');
+    } else if (account.toLowerCase() === 'sagility') {
+      console.log('Setting Sagility defaults: All, All');
+      // Sagility users: set to All to give them full access
+      setSelectedReport('All');
+      setSelectedGsp('All');
+    }
+  }
+}, [account]); // Only run when account changes
 
 
 // useEffect(() => {
@@ -663,7 +740,7 @@ const fetchCaseStatusCt = async () => {
 let poc = pocId
   try {
     const res = await axios.get(`${dataApiUrl}get_cases_status_ct_poc`, {
-      params: { poc, claim_system: getClaimSystemParam() }
+      params: { poc, claim_system: getClaimSystemParam(), account: getAccountParam() }
     });
 
     if (res.data) {
@@ -811,7 +888,7 @@ const fetchAgeBuckets = async () => {
 
   try {
     const res = await axios.get(`${dataApiUrl}get_age_bucket_poc`, {
-      params: { poc: pocId, claim_system: getClaimSystemParam() }
+      params: { poc: pocId, claim_system: getClaimSystemParam(), account: getAccountParam() }
     });
     const data = res.data || [];
 
@@ -1334,11 +1411,46 @@ const handleReassignAppeals = async () => {
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between",  backgroundColor: "white", padding: 24, borderRadius: 10, marginBottom: 30, maxWidth: 1500, marginInline: "auto", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <label htmlFor="reportSelect" style={{ fontWeight: 600 }}>Choose report:</label>
-            <select id="reportSelect" value={selectedReport} onChange={(e) => setSelectedReport(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 14 }}>
-              {/* <option>Facets</option> */}
-              <option>All</option>
-              <option>Facets</option>
-              <option>Proclaim</option>
+            <select 
+              id="reportSelect" 
+              value={selectedReport} 
+              onChange={(e) => setSelectedReport(e.target.value)} 
+              disabled={isDropdownDisabled()}
+              style={{ 
+                padding: "8px 12px", 
+                borderRadius: 6, 
+                border: "1px solid #ccc", 
+                fontSize: 14,
+                backgroundColor: isDropdownDisabled() ? "#f5f5f5" : "white",
+                cursor: isDropdownDisabled() ? "not-allowed" : "pointer"
+              }}
+            >
+              {getAvailableReportOptions().map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="gspSelect" style={{ fontWeight: 600, marginLeft: 16 }}>Choose GSP:</label>
+            <select 
+              id="gspSelect" 
+              value={selectedGsp} 
+              onChange={(e) => setSelectedGsp(e.target.value)} 
+              disabled={isDropdownDisabled()}
+              style={{ 
+                padding: "8px 12px", 
+                borderRadius: 6, 
+                border: "1px solid #ccc", 
+                fontSize: 14,
+                backgroundColor: isDropdownDisabled() ? "#f5f5f5" : "white",
+                cursor: isDropdownDisabled() ? "not-allowed" : "pointer"
+              }}
+            >
+              {getAvailableGspOptions().map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
             </select>
             <button onClick={triggerFileDialog} style={{ backgroundColor: "#0071ce", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Upload Excel</button>
            <a href="https://uat-cg-lpi-portal.sagilityhealth.com:8081/api/ExportControllers/appeals_template_download" style={{ textDecoration: "none" }}>
