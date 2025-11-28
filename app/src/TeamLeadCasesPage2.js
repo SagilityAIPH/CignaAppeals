@@ -1464,11 +1464,11 @@ const fetchCaseDetailsById = async (id) => {
                             <div>❔ Unassigned: <strong>{unassigned}</strong></div>
                             <div>🟡 Pended: <strong>{pended}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
-                            <div>📂 Open: <strong>{open}</strong></div>
+                            <div>📂 Open/Pend: <strong>{open}</strong></div>
                             <div>✅ Completed: <strong>{completed}</strong></div>
 
                             <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px" }}>🟦 Pre-Service Cases</div>
-                            <div>📂 Open: <strong>{open_PreService}</strong></div>
+                            <div>📂 Open/Pend: <strong>{open_PreService}</strong></div>
                             <div>🟡 Pended: <strong>{pended_PreService}</strong></div>
                             <div>✅ Completed: <strong>{completed_PreService}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_PreService}</strong></div>
@@ -1480,7 +1480,7 @@ const fetchCaseDetailsById = async (id) => {
                           {/* Right Column */}
                           <div style={{ flex: "1 1 45%" }}>
                             <div style={{ fontWeight: "600", color: "#003b70" }}>🔴 Non-Compliant(Yes) Cases</div>
-                            <div>📂 Open: <strong>{open_NonCompliant}</strong></div>
+                            <div>📂 Open/Pend: <strong>{open_NonCompliant}</strong></div>
                             <div>🟡 Pended: <strong>{pended_NonCompliant}</strong></div>
                             <div>✅ Completed: <strong>{completed_NonCompliant}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_NonCompliant}</strong></div>
@@ -1489,7 +1489,7 @@ const fetchCaseDetailsById = async (id) => {
                             <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
 
                             <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px" }}>🟩 PG(Yes) Cases</div>
-                            <div>📂 Open: <strong>{open_PG}</strong></div>
+                            <div>📂 Open/Pend: <strong>{open_PG}</strong></div>
                             <div>🟡 Pended: <strong>{pended_PG}</strong></div>
                             <div>✅ Completed: <strong>{completed_PG}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_PG}</strong></div>
@@ -1652,7 +1652,7 @@ const fetchCaseDetailsById = async (id) => {
                       Owner Name
                     </th>
                     <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
-                      Open
+                      Pend
                     </th>
                     <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
                       Pended
@@ -1760,7 +1760,7 @@ const fetchCaseDetailsById = async (id) => {
           }}
         >
           <option value="">All</option>
-          <option value="Open">Open</option>
+          <option value="Pend">Pend</option>
           <option value="Pended">Pended</option>
           <option value="Completed">Completed</option>
           <option value="FFup Sent">FFup Sent</option>
@@ -2602,7 +2602,7 @@ const fetchCaseDetailsById = async (id) => {
                 OWNER_HELPER: "ASSIGNED"
               };
             });
-            handleUpdateAssignedStatus({ status: "Assigned" });
+            handleUpdateAssignedStatus({ status: "Open" });
             handleAssignCases({ status: "Assigned" });
             handleReassignAppeals();
             setPreserviceRows(updated);

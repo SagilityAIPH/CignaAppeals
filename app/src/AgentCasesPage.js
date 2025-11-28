@@ -311,6 +311,7 @@ const fetchCaseDetailsById = async (id) => {
 
 const [statusCounts, setStatusCounts] = useState({
   completed: 0,
+  new_assigned:0,
   pended: 0,
   ff_sent: 0,
   open: 0,
@@ -332,6 +333,7 @@ const fetchStatusCounts = async () => {
     if (data) {
       setStatusCounts({
         completed: data.completed || 0,
+        new_assigned: data.new_Assigned || 0,
         pended: data.pended || 0,
         ff_sent: data.fFup_Sent || 0,
         open: data.open || 0,
@@ -344,6 +346,7 @@ const fetchStatusCounts = async () => {
     console.error('Error fetching case status counts:', error);
     setStatusCounts({
       completed: 0,
+      new_assigned: 0,
       pended: 0,
       ff_sent: 0,
       open: 0,
@@ -844,6 +847,7 @@ const ownedRows = preserviceRows.filter(
     // const total = ownedRows.length;
 
     const completed = statusCounts.completed
+    const new_assigned = statusCounts.new_assigned
     const pended = statusCounts.pended
     const ff_sent = statusCounts.ff_sent
     const open = statusCounts.open
@@ -859,13 +863,18 @@ const ownedRows = preserviceRows.filter(
         </div>
 
         <div style={{ marginBottom: '8px' }}>
-          <span role="img" aria-label="hourglass">⏳</span> Open / Untouched:{' '}
+          <span role="img" aria-label="hourglass">⏳</span> Open / Pend:{' '}
           <strong>{open}</strong>
         </div>
 
         <div style={{ marginBottom: '8px' }}>
           <span role="img" aria-label="check">✅</span> Completed:{' '}
           <strong>{completed}</strong>
+        </div>
+
+          <div style={{ marginBottom: '8px' }}>
+          <span role="img" aria-label="check">🆕</span> New Assigned:{' '}
+          <strong>{new_assigned}</strong>
         </div>
 
         <div style={{ marginBottom: '12px' }}>
@@ -1090,13 +1099,14 @@ const ownedRows = preserviceRows.filter(
       }}
     >
       <option value="All">All</option>
-      <option value="Open">Open</option>
+      <option value="Pend">Pend</option>
       <option value="Completed">Completed</option>
       <option value="Pended">Pended</option>
+      <option value="New Assigned">New Assigned</option>
       <option value="FFup Sent">FFup Sent</option>
     </select>
   </div>
-
+{/* 
   <div style={{ width: '200px' }}>
     <label
       style={{
@@ -1124,7 +1134,7 @@ const ownedRows = preserviceRows.filter(
       <option value="Y">New Assignment</option>
       <option value="N">Pended</option>
     </select>
-  </div>
+  </div> */}
 
   {/* Rows Per Page */}
   <div style={{ display: 'flex', flexDirection: 'column', width: '150px' }}>

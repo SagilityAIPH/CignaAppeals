@@ -253,6 +253,7 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   const preserviceColumnMap = {
     'Age Cal': 'AGE',
     'SR': 'SR.',
+     'ff': 'FFup Days',
     'Manager': 'Manager',
     'AGE_PROMISE_BUCKET': 'PROMISE',
     'Promise Date': 'Task Promise Date',
@@ -270,6 +271,7 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
 let caseTblAllColumnMap = {
   
   sr: "SR",
+   ff: 'FFup (Days)',
   age_Cal: "Age (Days)",
   manager: "Manager",
   agE_PROMISE: "Promise",
@@ -378,7 +380,14 @@ if (caseStatusFilter === "Pended") {
     pG_YTD_RESULT: "PG YTD Result",
     recd_date_flag: "Received Date Flag",
     case_assignment_status: "Case Assignment Status",
-    pend_reason: "Pending Reason"
+    pend_reason: "Pending Reason",
+    reassign: "Reassign",
+    reassign_by: "Reassign By",
+    reassign_date: "Reassign Date",
+    ff: "FFup (Days)",
+    ff_by: "FFup By",
+    ff_to: "FFup To",
+    ff_date: "FFup Date"
   };
 
   const getOwnerHelperValue = (row) => {
@@ -396,7 +405,7 @@ if (caseStatusFilter === "Pended") {
     switch (account.toLowerCase()) {
       case 'concentrix':
        
-        return ['Proclaim']; // Concentrix users only see Proclaim
+        return ['Facets', 'Proclaim']; // Concentrix users can choose between Facets and Proclaim
       case 'wipro':
         return ['Facets'];
       case 'sagility':
@@ -428,6 +437,14 @@ if (caseStatusFilter === "Pended") {
 
   // Helper function to determine if dropdowns should be disabled
   const isDropdownDisabled = useCallback(() => {
+    // Only Wipro has both dropdowns disabled
+    // Concentrix can now use Choose Report dropdown
+    return account && account.toLowerCase() === 'wipro';
+  }, [account]);
+
+  // Helper function to determine if GSP dropdown should be disabled
+  const isGspDropdownDisabled = useCallback(() => {
+    // GSP dropdown is disabled for Concentrix and Wipro (they can only see their own GSP)
     return account && ['concentrix', 'wipro'].includes(account.toLowerCase());
   }, [account]);
 
@@ -496,7 +513,7 @@ const toggleRowSelection = (row) => {
 
 const fetchAgents = async () => {
   try {
-    const response = await axios.get(`${dataApiUrl}appeals_agents_list`);
+    const response = await axios.get(`${dataApiUrl}appeals_agents_list?account=${account}`);
     const agents = response.data || [];
 
     // Filter agents whose account matches any of the values in departmentList
@@ -590,6 +607,18 @@ const fetchCasesAll = async () => {
 const fetchCasesPage = async (page = currentPage, size = pageSize) => {
   setIsLoading(true);
 
+  // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
+  if (!claimSystemParam && !accountParam) {
+    if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
+      console.error('❌ BLOCKED: API call prevented - account parameter required for', account);
+      setIsLoading(false);
+      setCaseTblAllPoc([]);
+      setTotalAppealCases(0);
+      return; // Exit early - don't call API
+    }
+    console.warn('⚠️ fetchCasesPage called with BLANK parameters for Sagility account');
+  }
+
   // Map selected prioritization value to backend params
   let prioritizationPayload = {
     NonCompliant2: '',
@@ -620,17 +649,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       ...prioritizationPayload
     };
     
-    // Add detailed debugging to track blank parameter calls
-    if (!claimSystemParam && !accountParam) {
-      console.warn('⚠️ fetchCasesPage called with BLANK parameters!', {
-        claimSystemParam, 
-        accountParam,
-        apiPayload,
-        stackTrace: new Error().stack
-      });
-    } else {
-      console.log('✅ fetchCasesPage called with proper parameters:', apiPayload);
-    }
+    console.log('✅ fetchCasesPage called with parameters:', apiPayload, 'for account:', account);
     
     console.log('API Request to cases_tbl_all_poc with payload:', apiPayload);
     
@@ -846,19 +865,20 @@ const handleSort = (columnKey) => {
 
 
 const fetchCaseStatusCt = async () => {
+  // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
+  if (!claimSystemParam && !accountParam) {
+    if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
+      console.error('❌ BLOCKED: fetchCaseStatusCt prevented - account parameter required for', account);
+      setCaseStatusCt(null);
+      return; // Exit early - don't call API
+    }
+    console.warn('⚠️ fetchCaseStatusCt called with BLANK parameters for Sagility account');
+  }
+
   try {
     const params = { claim_system: claimSystemParam, account: accountParam };
     
-    // Add detailed debugging to track blank parameter calls
-    if (!claimSystemParam && !accountParam) {
-      console.warn('⚠️ fetchCaseStatusCt called with BLANK parameters!', {
-        claimSystemParam, 
-        accountParam,
-        stackTrace: new Error().stack
-      });
-    } else {
-      console.log('✅ fetchCaseStatusCt called with proper parameters:', params);
-    }
+    console.log('✅ fetchCaseStatusCt called with parameters:', params, 'for account:', account);
     
     const res = await axios.get(`${dataApiUrl}get_cases_status_ct_poc`, {
       params: params
@@ -1006,20 +1026,21 @@ const fetchCaseDetailsById = async (id) => {
 };
 
 const fetchAgeBuckets = async () => {
+  // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
+  if (!claimSystemParam && !accountParam) {
+    if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
+      console.error('❌ BLOCKED: fetchAgeBuckets prevented - account parameter required for', account);
+      setAgeSummary([]);
+      setDepartmentList([]);
+      return; // Exit early - don't call API
+    }
+    console.warn('⚠️ fetchAgeBuckets called with BLANK parameters for Sagility account');
+  }
 
   try {
     const params = { claim_system: claimSystemParam, account: accountParam };
     
-    // Add detailed debugging to track blank parameter calls
-    if (!claimSystemParam && !accountParam) {
-      console.warn('⚠️ fetchAgeBuckets called with BLANK parameters!', {
-        claimSystemParam, 
-        accountParam,
-        stackTrace: new Error().stack
-      });
-    } else {
-      console.log('✅ fetchAgeBuckets called with proper parameters:', params);
-    }
+    console.log('✅ fetchAgeBuckets called with parameters:', params, 'for account:', account);
     
     const res = await axios.get(`${dataApiUrl}get_age_bucket_poc`, {
       params: params
@@ -1268,7 +1289,8 @@ const fetchAgeBuckets = async () => {
       
         alert(`Failed to update case status to ${status}.`);
       }
-    } else {
+    } 
+    else {
       // ✅ Assign to agents in chunks
       if (!assignTo || assignTo.length === 0) {
         alert("No agents selected to assign cases.");
@@ -1300,19 +1322,50 @@ const fetchAgeBuckets = async () => {
           ownerName: agent.agent_name
         });
 
+        // ✅ Step 1: Update assignment in database
         await axios.post(`${dataApiUrl}appeal_case_assignment_update`, {
           ids,
           status,
           CignaID: agent.agent,
-          sessID: '',
+          sessID: pocId,
           ownerID: agent.agent,
           ownerName: agent.agent_name
         });
+
+        // ✅ Step 2: Update case status to "New Assigned"
+        await axios.post(
+            `${dataApiUrl}appeal_cases_status_update`,
+            {
+              ids: ids,
+              status: 'New Assigned',
+              pend_reason: null
+            }
+        );
+
+        // ✅ Step 3: Send reassignment email to agent, lead, and manager
+        const emailPayload = {
+          id: ids,
+          agentEmail: agent.agentCIGNA_Email_Address || '',
+          leadEmail: agent.team_Lead_CIGNA_Email_Address || '',
+          managerEmail: agent.manager_CIGNA_Email_Address || ''
+        };
+
+        try {
+          await axios.post(`${dataApiEmailUrl}ReassignAppeals`, emailPayload);
+          console.log(`✅ Reassignment email sent to ${agent.agent_name_withId}`);
+        } catch (emailError) {
+          console.error(`❌ Failed to send reassignment email to ${agent.agent_name_withId}:`, emailError.response?.data || emailError.message);
+          // Continue even if email fails - assignment already succeeded
+        }
+         
+
       }
     }
 
     // ✅ After successful update
-    await fetchAgeBuckets();       // Optional refresh
+    await fetchAgeBuckets();
+    await fetchCasesPage(currentPage, pageSize);
+    await fetchCaseStatusCt();       // Optional refresh
     setSelectedRows([]);
     setAssignTo([]);
 
@@ -1358,50 +1411,62 @@ const fetchAgeBuckets = async () => {
       ownerIdGroups[ownerId].push(row.id);
     });
     console.log("Checking against agentList:", agentList);
-    // Process each owner group
-    for (const ownerId in ownerIdGroups) {
-      const ids = ownerIdGroups[ownerId];
-  
-      // Find the matching agent data
-      const agentData = agentList.find(agent => agent.agent?.toUpperCase() === ownerId.toUpperCase());
-      if (!agentData) {
-        console.warn(`No agent data found for ownerID: ${ownerId}`);
-        continue;
-      }
-  
-      const payload = {
-        id: ids,
-        agentEmail: agentData.agentCIGNA_Email_Address?.trim() || '',
-        leadEmail: agentData.team_Lead_CIGNA_Email_Address?.trim() || '',
-        managerEmail: agentData.manager_CIGNA_Email_Address?.trim() || '',
-        agentID: ownerId
-      };
-  
-      try {
-        // Step 1: Send follow-up email
     
-        await axios.post(`${dataApiEmailUrl}FollowUpAppeals`, payload);
-  
-        // Step 2: Update DB
-      
-        await axios.post(`${dataApiUrl}appeals_main_followup`, {
-          ids: payload.id,
-          cignaID: payload.agentID,
-          sessID: ""
-        });
-
-        setShowFollowToast(true);
-  
-      } catch (err) {
-        console.error(`Error for ownerID ${ownerId}`, err);
-      }
-    }
-  
-    // Step 3: Update status for all selected rows
+    let emailsSentSuccessfully = false;
+    
     try {
-      await handleUpdateAssignedStatus({ status: "FFup Sent" });
-    } catch (err) {
-      console.error("Error updating status", err);
+      // Process each owner group
+      for (const ownerId in ownerIdGroups) {
+        const ids = ownerIdGroups[ownerId];
+    
+        // Find the matching agent data
+        const agentData = agentList.find(agent => agent.agent?.toUpperCase() === ownerId.toUpperCase());
+        if (!agentData) {
+          console.warn(`No agent data found for ownerID: ${ownerId}`);
+          continue;
+        }
+    
+        const payload = {
+          id: ids,
+          agentEmail: agentData.agentCIGNA_Email_Address?.trim() || '',
+          leadEmail: agentData.team_Lead_CIGNA_Email_Address?.trim() || '',
+          managerEmail: agentData.manager_CIGNA_Email_Address?.trim() || '',
+          agentID: ownerId
+        };
+    
+        try {
+          // Step 1: Send follow-up email
+      
+          await axios.post(`${dataApiEmailUrl}FollowUpAppeals`, payload);
+    
+          // Step 2: Update DB
+        
+          await axios.post(`${dataApiUrl}appeals_main_followup`, {
+            ids:  ids,
+            cignaID: ownerId,
+            sessID: pocId
+          });
+
+          emailsSentSuccessfully = true;
+          setShowFollowToast(true);
+    
+        } catch (err) {
+          console.error(`Error for ownerID ${ownerId}`, err);
+          // Continue processing other owners even if one fails
+        }
+      }
+    } finally {
+      // Step 3: Always update status for all selected rows, even if some emails failed
+      if (emailsSentSuccessfully) {
+        try {
+          await handleUpdateAssignedStatus({ status: "FFup Sent" });
+          await fetchAgeBuckets();
+          await fetchCasesPage(currentPage, pageSize);
+          await fetchCaseStatusCt();
+        } catch (err) {
+          console.error("Error updating status", err);
+        }
+      }
     }
   };
   
@@ -1515,19 +1580,17 @@ const handleReassignAppeals = async () => {
       console.error('API Error:', error);
     }
   };
-
-  const caseStatusUpdate = async () => {
-    const payload = {
-      status: "string",
-    };
-
-    try {
-      const response = await axios.post(serverAPI + '/api/AppealsIssue/appeal_case_status_update', payload);
-      console.log('Server Response:', response.data);
-    } catch (error) {
-      console.error('API Error:', error);
-    }
-  };
+const caseStatusUpdate = async (status) => {
+  try {
+    const response = await axios.post(
+      `${serverAPI}/api/AppealsIssue/appeal_case_status_update`,
+      { status }  // <-- JSON body
+    );
+    console.log('Server Response:', response.data);
+  } catch (error) {
+    console.error('API Error:', error);
+  }
+};
 
   const caseStatusCount = async () => {
     const payload = {
@@ -1925,14 +1988,14 @@ const handleReassignAppeals = async () => {
                                   <div>❔ Unassigned: <strong>{unassigned}</strong></div>
                                   <div>🟡 Pended: <strong>{pended}</strong></div>
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
-                                  <div>📂 Open: <strong>{open}</strong></div>
+                                  <div>📂 Pend: <strong>{open}</strong></div>
                                   <div>✅ Completed: <strong>{completed}</strong></div>
                                 </div>
 
                                 {/* Right column */}
                                 <div style={{ flex: "1 1 45%" }}>
                                   <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🔴 Non-Compliant(Yes) Cases</div>
-                                  <div>📂 Open: <strong>{open_NonCompliant}</strong></div>
+                                  <div>📂 Pend: <strong>{open_NonCompliant}</strong></div>
                                   <div>🟡 Pended: <strong>{pended_NonCompliant}</strong></div>
                                   <div>✅ Completed: <strong>{completed_NonCompliant}</strong></div>
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent_NonCompliant}</strong></div>
@@ -1943,7 +2006,7 @@ const handleReassignAppeals = async () => {
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
                                   <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟦 Pre-Service Cases</div>
-                                  <div>📂 Open: <strong>{open_PreService}</strong></div>
+                                  <div>📂 Pend: <strong>{open_PreService}</strong></div>
                                   <div>🟡 Pended: <strong>{pended_PreService}</strong></div>
                                   <div>✅ Completed: <strong>{completed_PreService}</strong></div>
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent_PreService}</strong></div>
@@ -1954,7 +2017,7 @@ const handleReassignAppeals = async () => {
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
                                   <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟩 PG(Yes) Cases</div>
-                                  <div>📂 Open: <strong>{open_PG}</strong></div>
+                                  <div>📂 Pend: <strong>{open_PG}</strong></div>
                                   <div>🟡 Pended: <strong>{pended_PG}</strong></div>
                                   <div>✅ Completed: <strong>{completed_PG}</strong></div>
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent_PG}</strong></div>
