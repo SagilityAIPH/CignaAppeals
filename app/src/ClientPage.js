@@ -12,13 +12,6 @@ const handleNavClick = (path, itemKey) => {
   setSelectedItem(itemKey);
 
   // Step 1: Set auto-load flag if going to /client/proclaim
-  if (path === "/client/proclaim") {
-    localStorage.setItem("autoLoadProclaim", "true");
-
-  } else if (path === "/client/facets") {
-  localStorage.setItem("autoLoadFacets", "true");   // new flag for Facets
-  }
-
   navigate(path);
 };
 
@@ -153,7 +146,7 @@ const handleNavClick = (path, itemKey) => {
       </button>
     </li>
 
-        <li className="nav-item px-3 mb-2">
+        {/* <li className="nav-item px-3 mb-2">
       <button
         onClick={() => handleNavClick("/client/impact", "impact")}
         style={{
@@ -173,7 +166,7 @@ const handleNavClick = (path, itemKey) => {
         <MdDashboard style={{ marginRight: "15px" }} />
         Impact
       </button>
-    </li>
+    </li> */}
 
   </ul>
 

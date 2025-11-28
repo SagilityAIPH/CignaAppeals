@@ -94,6 +94,10 @@ function POCPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedReport, setSelectedReport] = useState("All");
   const [selectedGsp, setSelectedGsp] = useState("All");
+  // New state to track the claim_system parameter based on selectedReport
+  const [claimSystemParam, setClaimSystemParam] = useState("");
+  // New state to track the account parameter based on selectedGsp
+  const [accountParam, setAccountParam] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -140,13 +144,39 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   const [ageSummary, setAgeSummary] = useState([]);
   const [caseStatusCt, setCaseStatusCt] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Debug: Track when important state variables change
+  useEffect(() => {
+    console.log('State Update - caseTblAllPoc changed:', {
+      length: caseTblAllPoc?.length,
+      first3: caseTblAllPoc?.slice(0, 3)
+    });
+  }, [caseTblAllPoc]);
+
+  useEffect(() => {
+    console.log('State Update - caseStatusCt changed:', caseStatusCt);
+  }, [caseStatusCt]);
+
+  useEffect(() => {
+    console.log('State Update - ageSummary changed:', {
+      length: ageSummary?.length,
+      first3: ageSummary?.slice(0, 3)
+    });
+  }, [ageSummary]);
   const [refreshing, setRefreshing] = useState(false);
   const { pocId, account } = useUser();
 
-  // Debug: Log the account value from UserContext
+  // Debug: Log the account value from UserContext and user data
   useEffect(() => {
     console.log('POCPage2 - Account from UserContext:', account);
-  }, [account]);
+    console.log('POCPage2 - User from UserContext:', user);
+    
+    // If we don't have an account but we have user data, try to derive or fetch account
+    if (!account && user?.agentID) {
+      console.log('No account found, but user exists. May need to fetch account from API or derive from user data');
+      // TODO: Add logic to fetch account from API based on user.agentID or other user properties
+    }
+  }, [account, user]);
 
   // Helper functions for agent name formatting and sorting
   const formatAgentName = (agentName) => {
@@ -358,65 +388,47 @@ if (caseStatusFilter === "Pended") {
     return (row[key] || "").trim().toUpperCase();
   }; 
 
-  // Helper function to convert selectedReport to claim_system parameter
-  const getClaimSystemParam = () => {
-    switch (selectedReport) {
-      case 'All': return '';
-      case 'Facets': return 'Facets';
-      case 'Proclaim': return 'Proclaim';
-      default: return '';
-    }
-  };
-
-  // Helper function to convert selectedGsp to account parameter
-  const getAccountParam = () => {
-    switch (selectedGsp) {
-      case 'All': return '';
-      case 'Sagility': return 'Sagility';
-      case 'Concentrix': return 'Concentrix';
-      case 'Wipro': return 'Wipro';
-      default: return '';
-    }
-  };
-
   // Helper functions to filter dropdown options based on user account
   const getAvailableReportOptions = useCallback(() => {
   
-    if (!account) return ['All', 'Proclaim', 'Facets']; // Default if no account
+    if (!account) return ['All', 'Proclaim', 'Facets', 'Others']; // Default if no account
     
     switch (account.toLowerCase()) {
       case 'concentrix':
        
         return ['Proclaim']; // Concentrix users only see Proclaim
+      case 'wipro':
+        return ['Facets'];
       case 'sagility':
      
-        return ['All', 'Proclaim', 'Facets']; // Sagility users see all options
+        return ['All', 'Facets', 'Proclaim', 'Others']; // Sagility users see all options
       default:
        
-        return ['All', 'Proclaim', 'Facets']; // Default all options
+        return ['All', 'Facets','Proclaim', 'Others']; // Default all options
     }
   }, [account]);
 
   const getAvailableGspOptions = useCallback(() => {
 
-    if (!account) return ['All', 'Concentrix', 'Sagility']; // Default if no account
+    if (!account) return ['All', 'Concentrix', 'Sagility', 'Wipro']; // Default if no account
     
     switch (account.toLowerCase()) {
       case 'concentrix':
       
         return ['Concentrix']; // Concentrix users only see Concentrix
+      case 'wipro':
+        return ['Wipro'];
+
       case 'sagility':
-       
-        return ['All', 'Concentrix', 'Sagility']; // Sagility users see all options
+        return ['All', 'Concentrix', 'Sagility', 'Wipro', 'Onshore']; // Sagility users see all options
       default:
-        
-        return ['All', 'Concentrix', 'Sagility']; // Default all options
+        return ['All', 'Concentrix', 'Sagility',  'Wipro', 'Onshore']; // Default all options
     }
   }, [account]);
 
   // Helper function to determine if dropdowns should be disabled
   const isDropdownDisabled = useCallback(() => {
-    return account && account.toLowerCase() === 'concentrix';
+    return account && ['concentrix', 'wipro'].includes(account.toLowerCase());
   }, [account]);
 
   const formatExcelDate = (value) => {
@@ -600,19 +612,44 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
   }
 
   try {
+    const apiPayload = {
+      caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
+      assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
+      claim_system: claimSystemParam,
+      account: accountParam,
+      ...prioritizationPayload
+    };
+    
+    // Add detailed debugging to track blank parameter calls
+    if (!claimSystemParam && !accountParam) {
+      console.warn('⚠️ fetchCasesPage called with BLANK parameters!', {
+        claimSystemParam, 
+        accountParam,
+        apiPayload,
+        stackTrace: new Error().stack
+      });
+    } else {
+      console.log('✅ fetchCasesPage called with proper parameters:', apiPayload);
+    }
+    
+    console.log('API Request to cases_tbl_all_poc with payload:', apiPayload);
+    
     const res = await axios.post(
       `${dataApiUrl}cases_tbl_all_poc?pageNumber=${page}&pageSize=${size}`,
-      {
-        poc: pocId,
-        caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
-        assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
-        claim_system: getClaimSystemParam(),
-        account: getAccountParam(),
-        ...prioritizationPayload
-      }
+      apiPayload
     );
 
     const { totalRecords, data } = res.data;
+    console.log('API Response from cases_tbl_all_poc:', {
+      totalRecords,
+      dataLength: data?.length,
+      firstFewRecords: data?.slice(0, 3), // Log first 3 records to see what data we're getting
+      accountsInData: [...new Set(data?.map(item => item.account))] // Show unique accounts in the response data
+    });
+    
+    console.log('Setting state - setCaseTblAllPoc with', data?.length, 'records');
+    console.log('Setting state - setTotalAppealCases to', totalRecords);
+    
     setCaseTblAllPoc(data);
     setTotalAppealCases(totalRecords);
   } catch (err) {
@@ -633,15 +670,25 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
 const didMountRef = useRef(false);
 // 2. Filter change watcher
 useEffect(() => {
-  setCurrentPage(1);
-  fetchCasesPage(1, pageSize)
-  fetchAgeBuckets();
-  fetchCaseStatusCt();
-}, [caseStatusFilter, assignmentFilter, prioritizationFilter, selectedReport, selectedGsp]);
+  // Only fetch data if we have an account (to ensure proper filtering)
+  if (account) {
+    console.log('🔄 Filter change detected with account:', account, 'parameters:', { claimSystemParam, accountParam });
+    setCurrentPage(1);
+    fetchCasesPage(1, pageSize)
+    fetchAgeBuckets();
+    fetchCaseStatusCt();
+  } else {
+    console.log('⏳ Waiting for account to be available before applying filters...');
+  }
+}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, claimSystemParam, accountParam, pageSize]); // Include account
 
 useEffect(() => {
-  fetchCasesPage(currentPage, pageSize);
-}, [currentPage, pageSize, selectedReport, selectedGsp]);
+  // Only fetch data if we have an account (to ensure proper filtering)
+  if (account) {
+    console.log('📄 Page change detected with account:', account, 'page:', currentPage);
+    fetchCasesPage(currentPage, pageSize);
+  }
+}, [account, currentPage, pageSize, claimSystemParam, accountParam]); // Include account
 
 const location = useLocation();
 
@@ -655,12 +702,17 @@ const location = useLocation();
   }, [location]);
 
 useEffect(() => {
- 
+  // Only fetch data if we have an account (to ensure proper filtering)
+  if (account) {
+    console.log('🚀 Initial data fetch triggered with account:', account, 'claimSystemParam:', claimSystemParam, 'accountParam:', accountParam);
     fetchAgeBuckets()
     fetchCasesPage(1, pageSize)
     fetchCaseStatusCt()
     setUploadComplete(true); // Reset upload state on mount
-}, [selectedReport, selectedGsp]);
+  } else {
+    console.log('⏳ Waiting for account to be available before fetching data...');
+  }
+}, [account, claimSystemParam, accountParam, pageSize]); // Include account as dependency
 
 // Set default dropdown values based on user account
 useEffect(() => {
@@ -672,14 +724,71 @@ useEffect(() => {
       // Concentrix users: force to their only options
       setSelectedReport('Proclaim');
       setSelectedGsp('Concentrix');
+      // Also immediately set the parameters to avoid initial blank API calls
+      setClaimSystemParam('Proclaim');
+      setAccountParam('Concentrix');
+    } else if (account.toLowerCase() === 'wipro') {
+      console.log('Setting Wipro defaults: Facets, Wipro');
+      // Wipro users: force to their only options
+      setSelectedReport('Facets');
+      setSelectedGsp('Wipro');
+      // Also immediately set the parameters to avoid initial blank API calls
+      setClaimSystemParam('Facets');
+      setAccountParam('Wipro');
     } else if (account.toLowerCase() === 'sagility') {
       console.log('Setting Sagility defaults: All, All');
       // Sagility users: set to All to give them full access
       setSelectedReport('All');
       setSelectedGsp('All');
+      // Also immediately set the parameters to avoid initial blank API calls
+      setClaimSystemParam(''); // 'All' maps to empty string
+      setAccountParam(''); // 'All' maps to empty string
     }
   }
 }, [account]); // Only run when account changes
+
+// Update claimSystemParam whenever selectedReport changes
+useEffect(() => {
+  // Only update parameters if we have an account (to avoid blank parameter calls)
+  if (account) {
+    const newClaimSystemParam = (() => {
+      switch (selectedReport) {
+        case 'All': return '';
+        case 'Facets': return 'Facets';
+        case 'Proclaim': return 'Proclaim';
+        case 'Others': return 'Others';
+        default: return '';
+      }
+    })();
+    
+    console.log('🔧 Updating claimSystemParam (with account):', selectedReport, '->', newClaimSystemParam, 'account:', account);
+    setClaimSystemParam(newClaimSystemParam);
+  } else {
+    console.log('⏸️ Skipping claimSystemParam update (no account):', selectedReport);
+  }
+}, [selectedReport, account]); // Include account as dependency
+
+// Update accountParam whenever selectedGsp changes
+useEffect(() => {
+  // Only update parameters if we have an account (to avoid blank parameter calls)
+  if (account) {
+    const newAccountParam = (() => {
+      switch (selectedGsp) {
+        case 'All': return '';
+        case 'Sagility': return 'Sagility';
+        case 'Concentrix': return 'Concentrix';
+        case 'Wipro': return 'Wipro';
+        case 'Onshore': return 'Onshore';
+        default: return '';
+      }
+    })();
+    
+    console.log('🔧 Updating accountParam (with account):', selectedGsp, '->', newAccountParam, 'account:', account);
+    setAccountParam(newAccountParam);
+  } else {
+    console.log('⏸️ Skipping accountParam update (no account):', selectedGsp);
+  }
+}, [selectedGsp, account]); // Include account as dependency
 
 
 // useEffect(() => {
@@ -737,11 +846,25 @@ const handleSort = (columnKey) => {
 
 
 const fetchCaseStatusCt = async () => {
-let poc = pocId
   try {
+    const params = { claim_system: claimSystemParam, account: accountParam };
+    
+    // Add detailed debugging to track blank parameter calls
+    if (!claimSystemParam && !accountParam) {
+      console.warn('⚠️ fetchCaseStatusCt called with BLANK parameters!', {
+        claimSystemParam, 
+        accountParam,
+        stackTrace: new Error().stack
+      });
+    } else {
+      console.log('✅ fetchCaseStatusCt called with proper parameters:', params);
+    }
+    
     const res = await axios.get(`${dataApiUrl}get_cases_status_ct_poc`, {
-      params: { poc, claim_system: getClaimSystemParam(), account: getAccountParam() }
+      params: params
     });
+
+    console.log('API Response from get_cases_status_ct_poc:', res.data);
 
     if (res.data) {
       setCaseStatusCt(res.data);
@@ -807,14 +930,12 @@ const handleAutoEmail = async () => {
 };
 
 const handleSendSummaryCountEmail = async () => {
-  const pocId = pocId; // Replace with dynamic value if needed
-
   try {
     const response = await axios.post(
       `${dataApiEmailUrl}SendUnassignedAppealsSummaryEmail`,
       null, // no body
       {
-        params: { pocId } // query string
+        params: { pocId } // Use pocId from UserContext that's already destructured
       }
     );
 
@@ -887,10 +1008,29 @@ const fetchCaseDetailsById = async (id) => {
 const fetchAgeBuckets = async () => {
 
   try {
+    const params = { claim_system: claimSystemParam, account: accountParam };
+    
+    // Add detailed debugging to track blank parameter calls
+    if (!claimSystemParam && !accountParam) {
+      console.warn('⚠️ fetchAgeBuckets called with BLANK parameters!', {
+        claimSystemParam, 
+        accountParam,
+        stackTrace: new Error().stack
+      });
+    } else {
+      console.log('✅ fetchAgeBuckets called with proper parameters:', params);
+    }
+    
     const res = await axios.get(`${dataApiUrl}get_age_bucket_poc`, {
-      params: { poc: pocId, claim_system: getClaimSystemParam(), account: getAccountParam() }
+      params: params
     });
+    
     const data = res.data || [];
+    console.log('API Response from get_age_bucket_poc:', {
+      dataLength: data.length,
+      firstFewRecords: data.slice(0, 3),
+      accountsInData: [...new Set(data.map(item => item.account))]
+    });
 
     // For filtering
     const departments = [
@@ -954,6 +1094,37 @@ const fetchAgeBuckets = async () => {
     setSelectedItem(key);
     navigate(path);
   };
+
+  // Clear all data when account changes to prevent showing cached data from previous account
+  useEffect(() => {
+    if (account) {
+      console.log('🔄 Account changed to:', account, '- Clearing cached data');
+      // Clear all data states to force fresh fetch for the new account
+      setCaseTblAllPoc([]);
+      setCaseStatusCt([]);
+      setAgeSummary([]);
+      setSelectedRows([]);
+      // Reset pagination
+      setCurrentPage(1);
+      
+      console.log('✅ Account change cleanup complete. Fresh data will be fetched by other useEffects.');
+    }
+  }, [account]); // Only depend on account
+
+  // Cleanup function when component unmounts to clear any remaining state
+  useEffect(() => {
+    return () => {
+      console.log('🧹 POCPage2 component unmounting - clearing all state');
+      // This will run when the component is unmounted (e.g., when user logs out)
+      setCaseTblAllPoc([]);
+      setCaseStatusCt([]);
+      setAgeSummary([]);
+      setSelectedRows([]);
+      setCurrentPage(1);
+      setClaimSystemParam(''); // Reset claimSystemParam on cleanup
+      setAccountParam(''); // Reset accountParam on cleanup
+    };
+  }, []);
 
   const handleFileSelect = async (e) => {
 

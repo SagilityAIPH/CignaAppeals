@@ -51,6 +51,8 @@ const totalPages = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
 const [showTMinusModal, setShowTMinusModal] = useState(false);
 const [criticalSRs, setCriticalSRs] = useState([]);
 // ─── Auto-fetch Excel once ───────────────────────────────────────────────
+// DISABLED - Now using API data instead of Excel auto-load
+/*
 useEffect(() => {
   const autoLoadFlag = localStorage.getItem('autoLoadAgent');
   if (autoLoadFlag === 'false') return;
@@ -128,6 +130,7 @@ useEffect(() => {
 
 }, []);
         // ← runs once on mount
+*/
 // const fetchCasesAll = async () => {
 //   let allData = [];
 //   let page = 1;
@@ -769,8 +772,8 @@ if (!validOwners.includes(owner)) return;
 
 
 
-{/* Total Appeals Summary Section */}{/* Total Appeals Summary Section */}
-{gnbSummary.length > 0 && (
+{/* Total Appeals Summary Section - Now using API statusCounts instead of Excel gnbSummary */}
+{true && (
   <div
     style={{
       marginTop: '0px',
@@ -917,8 +920,8 @@ const ownedRows = preserviceRows.filter(
   </div>
 )}
 
-{/* Pre-Service Section */}
-{preserviceRows.length > 0 && (
+{/* Pre-Service Section - Now using API data (caseTblAllAgent) instead of Excel */}
+{true && (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',

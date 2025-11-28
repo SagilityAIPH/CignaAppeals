@@ -86,16 +86,26 @@ export const UserProvider = ({ children }) => {
   }
 };
   const logout = () => {
+    console.log('🚪 Logging out - Clearing all user state and session data');
+    
+    // Clear all React state
     setUser(null);
     setAgentId(null);
     setTeamLeadId(null);
     setClientId(null);
     setPocId(null);
-
+    setAccount(null); // Clear account state
+    
+    // Clear all session storage
     sessionStorage.removeItem("currentUser");
     sessionStorage.removeItem("roleIds");
     sessionStorage.removeItem("loginState");
     sessionStorage.clear();
+    
+    // Clear any localStorage items that might persist data
+    localStorage.clear();
+    
+    console.log('✅ Logout complete - All state cleared');
   };
 
   const value = {

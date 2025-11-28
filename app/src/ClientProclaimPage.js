@@ -57,6 +57,7 @@ function ClientProclaimPage() {
       Sagility: 0,
       Concentrix: 0,
       Wipro: 0,
+      Onshore: 0,
     });
     const [trendData, setTrendData] = useState([]);
     const [viewMode, setViewMode] = useState('Daily');
@@ -82,22 +83,15 @@ const [selectedPgYesGsp, setSelectedPgYesGsp] = useState('All');
 const [selectedPreSerGsp, setSelectedPreSerGsp] = useState('All');
 
     useEffect(() => {
-      const shouldAutoLoad = localStorage.getItem("autoLoadProclaim");
-      //fetchProclaimSummary();
-      if (shouldAutoLoad === "true") {
-        handleAutoUpload();                      // Trigger upload
-        localStorage.removeItem("autoLoadProclaim"); // Clear the flag so it doesn't repeat
-      }
+      // Initial data load on component mount
       fetchProclaimSummary();
       fetchProclaimStatusGraph();
-       //fetchNonCompliant();
-       fetchProclaimPendReasonCt();
-       fetchMbrPrv();
-       //fetchComplianceData();
-       fetchComplianceRawData()
-       fetchPgNameSummary();
-       fetchNonAsoSummary();
-      fetchPreserviceRows();
+      fetchProclaimPendReasonCt();
+      fetchMbrPrv();
+      fetchComplianceRawData();
+      fetchPgNameSummary();
+      fetchNonAsoSummary();
+      fetchPreserviceRows(selectedPreSerGsp, preservicePage, preservicePageSize);
     }, []);
 
     const fetchNonCompliant = async () => {
@@ -173,21 +167,20 @@ const fetchPreserviceRows = async (gsp, page, size) => {
   try {
     const res = await axios.post(
       `${dataApiUrl}cases_tbl_all_pre_service`,
-       {}, 
       {
-        params: {
-          account: gsp === "All" ? "" : gsp,
-          pageNumber: page,
-          pageSize: size,
-        },
+        account: gsp === "All" ? "" : gsp,
+        pageNumber: page,
+        pageSize: size,
+        claim_system: claimSystem,
       }
     );
+    console.log('🔵 PROCLAIM: fetchPreserviceRows - claim_system:', claimSystem);
     setPreserviceRows(res.data.data || []);
     setPreserviceTotal(res.data.totalRecords || 0);
   } catch (err) {
     setPreserviceRows([]);
     setPreserviceTotal(0);
-    console.error("Failed to fetch Pre-Service Appeals:", err);
+    console.error("🔴 PROCLAIM Failed to fetch Pre-Service Appeals:", err);
   }
   setIsPreserviceLoading(false);
 };
@@ -198,21 +191,20 @@ const fetchPgYesRows = async (gsp, page, size) => {
   try {
     const res = await axios.post(
       `${dataApiUrl}cases_tbl_all_pg_yes`,
-      {}, // POST body is empty, params go in config
       {
-        params: {
-          account: gsp === "All" ? "" : gsp,
-          pageNumber: page,
-          pageSize: size,
-        },
+        account: gsp === "All" ? "" : gsp,
+        pageNumber: page,
+        pageSize: size,
+        claim_system: claimSystem,
       }
     );
+    console.log('🔵 PROCLAIM: fetchPgYesRows - claim_system:', claimSystem);
     setPgYesRows(res.data.data || []);
     setPgYesTotal(res.data.totalRecords || 0);
   } catch (err) {
     setPgYesRows([]);
     setPgYesTotal(0);
-    console.error("Failed to fetch PG YES Appeals:", err);
+    console.error("🔴 PROCLAIM Failed to fetch PG YES Appeals:", err);
   }
   setIsPgYesLoading(false);
 };
@@ -220,16 +212,19 @@ const fetchPgYesRows = async (gsp, page, size) => {
 
 function fetchComplianceRawData(){
   // Fetch only once
-  axios.post(`${dataApiUrl}get_dashboard_out_of_compliance_ct`, {}, {
-    params: { account: 'Onshore', claim_system: claimSystem }
+  console.log('🔵 PROCLAIM: fetchComplianceRawData - claim_system:', claimSystem);
+  axios.post(`${dataApiUrl}get_dashboard_out_of_compliance_ct`, {
+    account: 'Onshore',
+    claim_system: claimSystem
   }).then(res => setComplianceRawData(res.data))
-    .catch(err => console.error("Error fetching compliance data:", err));
+    .catch(err => console.error("🔴 PROCLAIM Error fetching compliance data:", err));
 }
 
   const fetchNonAsoStats2 = async () => {
      try {
     const res = await axios.post(`${dataApiUrl}get_dashboard_non_aso_ct`, {
-      params: { director: selectedDirector === 'All' ? '' : selectedDirector, claim_system: claimSystem }
+      director: selectedDirector === 'All' ? '' : selectedDirector,
+      claim_system: claimSystem
     });
     setNonAsoStats(res.data || []);
     // Only allow Sagility, Concentrix, Onshore
@@ -241,7 +236,7 @@ function fetchComplianceRawData(){
   } catch (err) {
     setNonAsoStats([]);
     setDirectorOptions(['All']);
-    console.error('Error fetching Non-ASO stats:', err);
+    console.error('🔴 PROCLAIM Error fetching Non-ASO stats:', err);
   }
   };
 useEffect(() => {
@@ -364,12 +359,14 @@ useEffect(() => {
   const fetchNonAsoStats = async () => {
     try {
       const res = await axios.post(`${dataApiUrl}get_dashboard_non_aso_ct`, {
-        params: { director: selectedDirector === 'All' ? 'Sagility' : selectedDirector, claim_system: claimSystem }
+        director: selectedDirector === 'All' ? 'Sagility' : selectedDirector,
+        claim_system: claimSystem
       });
+      console.log('🔵 PROCLAIM: fetchNonAsoStats - claim_system:', claimSystem);
       setNonAsoStats(res.data || []);
     } catch (err) {
       setNonAsoStats([]);
-      console.error('Error fetching Non-ASO stats:', err);
+      console.error('🔴 PROCLAIM Error fetching Non-ASO stats:', err);
     }
   };
   
@@ -378,8 +375,9 @@ useEffect(() => {
     const fetchProclaimStatusGraph = async () => {
         try {
           const res = await axios.post(`${dataApiUrl}get_dashboard_status_ct`, {
-            params: { claim_system: claimSystem }
+            claim_system: claimSystem
           });
+          console.log('🔵 PROCLAIM: fetchProclaimStatusGraph - claim_system:', claimSystem);
           const filtered = res.data.filter(x => x.Account !== 'Total');
           const mapped = filtered.map(item => ({
             date: new Date(item.upload_Date).toLocaleDateString('en-CA'),
@@ -391,7 +389,7 @@ useEffect(() => {
           }));
           setTrendData(mapped);
         } catch (err) {
-          console.error(err);
+          console.error('🔴 PROCLAIM Error in fetchProclaimStatusGraph:', err);
         }
       };
     
@@ -406,13 +404,14 @@ const fetchPgNameSummary = async () => {
     // ✅ Use the current filter value
     const account = selectedPgSummaryGsp === 'All' ? '' : selectedPgSummaryGsp;
     const res = await axios.post(`${dataApiUrl}get_dashboard_pg_names_ct`, {
-      params: { account, claim_system: claimSystem }
+      account: account,
+      claim_system: claimSystem
     });
     
-    
+    console.log('🔵 PROCLAIM: fetchPgNameSummary - claim_system:', claimSystem);
     setPgNameSummary(res.data || []);
   } catch (error) {
-   
+    console.error('🔴 PROCLAIM Error in fetchPgNameSummary:', error);
     setPgNameSummary([]);
   }
 };
@@ -432,9 +431,11 @@ const filteredPgNames = useMemo(() => {
         try {
           const gsp = 'Onshore';
           const res = await axios.post(`${dataApiUrl}get_dashboard_non_aso_ct`, {
-            params: { direcotr: gsp, claim_system: claimSystem }
+            direcotr: gsp,
+            claim_system: claimSystem
           });
-         
+          console.log('🔵 PROCLAIM: fetchNonAsoSummary - claim_system:', claimSystem);
+          setNonAsoStats(res.data || []);
         } catch (error) {
           console.error("Error fetching PG name summary:", error);
          
@@ -444,11 +445,15 @@ const filteredPgNames = useMemo(() => {
 
     const fetchProclaimSummary = async () => {
       try {
+        console.log('🔵 PROCLAIM: Fetching summary with claim_system:', claimSystem);
         const response = await axios.post(`${dataApiUrl}get_dashboard_summary`, {
-          params: { claim_system: claimSystem }
+          claim_system: claimSystem,
+          account: ''
         });
         const data = response.data;
-    
+        console.log('🔵 PROCLAIM API Response - get_dashboard_summary:', data);
+        console.log('🔵 PROCLAIM Total Records:', data?.length);
+        
         setSummaryData(data);
     
         // Group by latest upload_date
@@ -465,7 +470,7 @@ const filteredPgNames = useMemo(() => {
         // Aggregate total_dashboard_Records per account
         const counts = latestRows.reduce((acc, row) => {
           const account = row.account?.trim();
-          if (account === "Sagility" || account === "Concentrix" || account === "Wipro") {
+          if (account === "Sagility" || account === "Concentrix" || account === "Wipro" || account === "Onshore") {
             acc[account] = (acc[account] || 0) + row.total_dashboard_Records;
           }
           return acc;
@@ -475,10 +480,25 @@ const filteredPgNames = useMemo(() => {
           Sagility: counts.Sagility || 0,
           Concentrix: counts.Concentrix || 0,
           Wipro: counts.Wipro || 0,
+          Onshore: counts.Onshore || 0,
         });
+        console.log('🔵 PROCLAIM Counts:', counts);
+        console.log('🔵 PROCLAIM Total:', (counts.Sagility || 0) + (counts.Concentrix || 0) + (counts.Wipro || 0) + (counts.Onshore || 0));
+
+        // ✅ Set proclaimSummary so conditional rendering works
+        // Create summary array with counts per account
+        const proclaimDirectors = ['Sagility', 'Concentrix', 'Wipro', 'Onshore'];
+        const summaryArray = proclaimDirectors.map(director => ({
+          Department: director,
+          Count: counts[director] || 0
+        }));
+        setProclaimSummary(summaryArray);
+        
+        // ✅ Enable marquee
+        setShowMarquee(true);
     
       } catch (err) {
-        console.error("Error fetching summary:", err);
+        console.error("🔴 PROCLAIM Error fetching summary:", err);
       }
     };
     
@@ -486,18 +506,20 @@ const filteredPgNames = useMemo(() => {
 
     
      const fetchProclaimPendReasonCt = async () => {
-
-      const account = 'Sagility';
-
       try {
+        // Convert "All" to empty string for API
+        const account = selectedPendedGsp === 'All' ? '' : selectedPendedGsp;
+        
         const response = await axios.post(`${dataApiUrl}get_dashboard_pend_reason_ct`, {
-          params: { selectedPendedGsp, claim_system: claimSystem }
+          account: account,
+          claim_system: claimSystem
         });
 
         setPendedReason(response.data);
+        console.log('🔵 PROCLAIM: fetchProclaimPendReasonCt - account:', account, 'claim_system:', claimSystem);
         
       } catch (error) {
-        console.error('Error fetching pend reason data:', error);
+        console.error('🔴 PROCLAIM Error fetching pend reason data:', error);
         throw error;
       }
     };
@@ -509,9 +531,11 @@ const filteredPgNames = useMemo(() => {
         const selectedPendedGsp = selectedGsp === "All" ? "" : selectedGsp;
       
         const response = await axios.post(`${dataApiUrl}get_dashboard_mbr_prov_ct`, {
-          params:  { account: selectedPendedGsp, claim_system: claimSystem }  
+          account: selectedPendedGsp,
+          claim_system: claimSystem
         });
       
+        console.log('🔵 PROCLAIM: fetchMbrPrv - claim_system:', claimSystem);
         const data = response.data;
   
         // Format: rename properties to match BarChart keys
@@ -748,8 +772,10 @@ const latestDateCounts2 = proclaimLatestDate
   const latestProclaimCounts = summaryData.reduce((acc, row) => {
     if (row.account === "Sagility") acc.Sagility = row.total_dashboard_Records;
     else if (row.account === "Concentrix") acc.Concentrix = row.total_dashboard_Records;
+    else if (row.account === "Wipro") acc.Wipro = row.total_dashboard_Records;
+    else if (row.account === "Onshore") acc.Onshore = row.total_dashboard_Records;
     return acc;
-  }, { Sagility: 0, Concentrix: 0 });
+  }, { Sagility: 0, Concentrix: 0, Wipro: 0, Onshore: 0 });
   
 
 
@@ -1279,14 +1305,16 @@ let transformedTrend = useMemo(() => {
 
 
 /* ---------- helper + reactive Pended-reason summary (row-based %) ---------- */
+/* DISABLED - Now using API data instead of Excel
 useEffect(() => {
   if (!excelData.length) {
     setPendedReasonSummary([]);
     return;
   }
 
-  /* full master reason list – keep order */
+  // full master reason list – keep order
 }, [excelData, trendView]);
+*/
 /* --------------------------------------------------------------------------- */
 
 
@@ -1445,7 +1473,7 @@ const sortIcon = (col) => {
 
 {/* Proclaim Appeals */}
 
-{proclaimSummary.length > 0 && (
+{proclaimSummary.length > 0 ? (
   <div style={{
     marginTop: '0px',
     marginBottom: '20px',
@@ -1479,9 +1507,11 @@ const sortIcon = (col) => {
       </div>
       <div style={{ fontSize: '14px', fontWeight: '500', color: '#003b70' }}>
       Total Appeals:&nbsp;
-      {(latestProclaimCounts.Sagility || 0) + (latestProclaimCounts.Concentrix || 0)}
+      {(latestProclaimCounts.Sagility || 0) + (latestProclaimCounts.Concentrix || 0) + (latestProclaimCounts.Wipro || 0) + (latestProclaimCounts.Onshore || 0)}
       &nbsp;|&nbsp; Sagility: {latestProclaimCounts.Sagility}
       &nbsp;|&nbsp; Concentrix: {latestProclaimCounts.Concentrix}
+      &nbsp;|&nbsp; Wipro: {latestProclaimCounts.Wipro}
+      &nbsp;|&nbsp; Onshore: {latestProclaimCounts.Onshore}
    
       </div>
     </div>
@@ -1596,7 +1626,7 @@ const sortIcon = (col) => {
     </div> */}
 
 {/* === NEW ▸ pended reason table ========================================== */}
-{pendedReasonSummary.length > 0 && (
+{pendedReason.length > 0 ? (
   <div style={{
     marginTop: '24px',
     backgroundColor: 'white',
@@ -1755,8 +1785,63 @@ const sortIcon = (col) => {
 
 
   </div>
+) : (
+  <div style={{
+    marginTop: '24px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '24px',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)',
+    textAlign: 'center'
+  }}>
+    <h4 style={{
+      fontSize: '17px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '16px'
+    }}>
+      Pended/Routed Appeals Breakdown by Reason
+    </h4>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
+    </div>
+  </div>
 )}
 
+  </div>
+) : (
+  <div style={{
+    marginTop: '0px',
+    marginBottom: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '40px',
+    fontFamily: 'Lexend, sans-serif',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      Proclaim Appeals Summary
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
+    </div>
   </div>
 )}
 
@@ -1764,7 +1849,7 @@ const sortIcon = (col) => {
 
 
         {/* Out of Compliance */}
-    {proclaimSummary.length > 0 && (
+    {transformComplianceTrend && Object.keys(transformComplianceTrend).length > 0 ? (
   <div style={{ paddingTop: '1px', marginLeft: '-30px', backgroundColor: '#F5F6FA', borderRadius: '10px' }}>
     <h3 style={{
       fontSize: '19px',
@@ -1845,13 +1930,42 @@ const sortIcon = (col) => {
       ))}
     </div>
   </div>
+) : (
+  <div style={{ 
+    paddingTop: '1px', 
+    marginLeft: '-30px', 
+    backgroundColor: '#F5F6FA', 
+    borderRadius: '10px', 
+    padding: '40px',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginLeft: '20px',
+      marginBottom: '10px',
+      marginTop: '10px',
+      fontFamily: 'Lexend, sans-serif'
+    }}>
+      Out of Compliance
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
+    </div>
+  </div>
 )}
 
 
 
 
 {/* Member vs Provider – Product Field */}
-{memberProviderSummary.length > 0 && (
+{memberProvider.length > 0 ? (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -1896,12 +2010,40 @@ const sortIcon = (col) => {
   </ResponsiveContainer>
 </div>
   </div>
+) : (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '40px',
+    fontFamily: 'Lexend, sans-serif',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      Member vs Provider Inventory
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
+    </div>
+  </div>
 )}
 
 
 
 {/* IFP Inventory and Aging Percentage */}
-{ifpSummary.length > 0 && (
+{ifpSummary.length > 0 ? (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -2025,11 +2167,38 @@ const sortIcon = (col) => {
       </ResponsiveContainer>
     </div>
   </div>
+) : (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '40px',
+    fontFamily: 'Lexend, sans-serif',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px'
+    }}>
+      IFP Inventory and Aging Percentage
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
+    </div>
+  </div>
 )}
 
 
 
-{proclaimSummary.length > 0 && (
+{pgNameSummary.length > 0 ? (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -2106,18 +2275,46 @@ const sortIcon = (col) => {
         whiteSpace: 'normal',
       }}>
      {filteredPgNames.map((row, index) => (
-    <li key={`pgName_${row.account}_${row.pG_NAME3}_${index}`}>
-      {row.pG_NAME3}: {row.pG_Count}
+    <li key={`pgName_${row.account}_${row.pG_NAME}_${index}`}>
+      {row.pG_NAME}: {row.pG_Count}
     </li>
   ))}
       </ul>
+    </div>
+  </div>
+) : (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '40px',
+    fontFamily: 'Lexend, sans-serif',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      PG Name Summary
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
     </div>
   </div>
 )}
 
 
        {/* Fully Insured Summary */}
-{proclaimSummary.length > 0 && (
+{nonAsoStats.length > 0 ? (
   <div style={{ 
     paddingTop: '1px',
     marginTop: '20px', 
@@ -2250,9 +2447,39 @@ const sortIcon = (col) => {
       })}
     </div>
   </div>
+) : (
+  <div style={{ 
+    paddingTop: '1px',
+    marginTop: '20px', 
+    marginLeft: '-30px',
+    backgroundColor:'#F5F6FA',
+    borderRadius: '10px',
+    padding: '40px',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '10px',
+      fontFamily: 'Lexend, sans-serif',
+      marginLeft: '20px',
+    }}>
+      Non-ASO
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
+    </div>
+  </div>
 )}
 {/* Pre-Service Section */}
-{proclaimSummary.length > 0 && (
+{preserviceTotal > 0 ? (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -2393,10 +2620,38 @@ const sortIcon = (col) => {
 </div>
     </div>
   </div>
+) : (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '40px',
+    fontFamily: 'Lexend, sans-serif',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      Pre-Service Appeals
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
+    </div>
+  </div>
 )}
 
 
-{proclaimSummary.length > 0 && (
+{pgYesTotal > 0 ? (
   <div style={{
     marginTop: '20px',
     marginLeft: '-30px',
@@ -2537,6 +2792,34 @@ const sortIcon = (col) => {
           disabled={pgYesPage * pgYesPageSize >= pgYesTotal}
         >Next</button>
       </div>
+    </div>
+  </div>
+) : (
+  <div style={{
+    marginTop: '20px',
+    marginLeft: '-30px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '10px',
+    padding: '40px',
+    fontFamily: 'Lexend, sans-serif',
+    textAlign: 'center'
+  }}>
+    <h3 style={{
+      fontSize: '19px',
+      fontWeight: '500',
+      color: '#003b70',
+      marginBottom: '10px',
+      marginTop: '0px'
+    }}>
+      PG Appeals
+    </h3>
+    <div style={{
+      fontSize: '16px',
+      color: '#666',
+      padding: '20px',
+      fontStyle: 'italic'
+    }}>
+      No data found
     </div>
   </div>
 )}
@@ -2733,9 +3016,7 @@ const sortIcon = (col) => {
   </div>
 )}
 
-
     </div>
   );
-//}
 }
 export default ClientProclaimPage;

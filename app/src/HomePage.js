@@ -2,12 +2,21 @@
 import React from "react";
 import { MdDashboard } from "react-icons/md";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useUser } from "./UserContext"; // Import useUser hook
 
 function HomePage({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useUser(); // Get logout function from context
 
   const isActive = (path) => location.pathname === path;
+
+  const handleLogout = () => {
+    console.log('🚪 User clicked logout - clearing all data and redirecting');
+    logout(); // Call the logout function from UserContext
+    // Redirect to login page or refresh the page to clear any remaining state
+    window.location.href = '/'; // Force a full page reload to ensure everything is cleared
+  };
 
   return (
     <>
@@ -38,6 +47,7 @@ function HomePage({ children }) {
             <span
               className="nav-link text-white"
               style={{ cursor: "pointer", fontWeight: 500 }}
+              onClick={handleLogout}
             >
               Logout
             </span>
