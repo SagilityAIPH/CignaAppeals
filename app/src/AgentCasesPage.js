@@ -391,6 +391,7 @@ let caseTblAllColumnMap = {
   id: "Id",
   age_Cal: "Age (Days)",
   sr: "SR",
+  ff: "FFUp (Days)",
   manager: "Manager",
   agE_PROMISE: "Promise",
   promise_Date: "Promise Date",
@@ -496,7 +497,14 @@ if (statusFilter === "Pended" || statusFilter === "Open" ) {
       pG_YTD_RESULT: "PG YTD Result",
       recd_date_flag: "Received Date Flag",
       case_assignment_status: "Case Assignment Status",
-      pend_reason: "Pending Reason"
+      pend_reason: "Pending Reason",
+      reassign: "Reassign",
+      reassign_by: "Reassign By",
+      reassign_date: "Reassign Date",
+      ff: "FFup (Days)",
+      ff_by: "FFup By",
+      ff_to: "FFup To",
+      ff_date: "FFup Date"
     };
     
   

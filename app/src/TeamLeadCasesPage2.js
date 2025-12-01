@@ -643,7 +643,7 @@ const handleSendFollowUpEmails = async () => {
         sessID: ""
       });
 
-      setShowFollowToast(true);
+     alert(`Follow-up email sent to ${agentData.agent_name} for ${ids.length} cases.`);
 
     } catch (err) {
       console.error(`Error for ownerID ${ownerId}`, err);
@@ -653,7 +653,11 @@ const handleSendFollowUpEmails = async () => {
   // Step 3: Update status for all selected rows
   try {
     await handleUpdateAssignedStatus({ status: "FFup Sent" });
+     
      fetchCasesPage(currentPage2, pageSize);
+     fetchAgeBucketSummary();
+     fetchCaseStatusPerAgent();
+     fetchCaseStatusCt();
   } catch (err) {
     console.error("Error updating status", err);
   }
@@ -726,10 +730,10 @@ const handleSendFollowUpEmails = async () => {
                 "0-14",
                 "15-29",
                 "30-44",
-                "45-59",
-                "60-89",
-                "90-179",
-                "180-364",
+                "45-60",
+                // "60-89",
+                // "90-179",
+                "60-364",
                 "365+",
               ];
 
@@ -832,6 +836,7 @@ const handleSendFollowUpEmails = async () => {
     
 let caseTblAllColumnMap = {
   sr: "SR",
+  ff: "FFUp (Days)",
   age_Cal: "Age (Days)",
   manager: "Manager",
   agE_PROMISE: "Promise",
@@ -940,7 +945,14 @@ if (caseStatusFilter === "Pended" || caseStatusFilter === "Open") {
     pG_YTD_RESULT: "PG YTD Result",
     recd_date_flag: "Received Date Flag",
     case_assignment_status: "Case Assignment Status",
-    pend_reason: "Pending Reason"
+    pend_reason: "Pending Reason",
+     reassign: "Reassign",
+    reassign_by: "Reassign By",
+    reassign_date: "Reassign Date",
+    ff: "FFup (Days)",
+    ff_by: "FFup By",
+    ff_to: "FFup To",
+    ff_date: "FFup Date"
   };
 
   const resolveExcelHeader = (friendlyHeader) => {
@@ -1197,10 +1209,10 @@ const fetchCaseDetailsById = async (id) => {
             "0-14",
             "15-29",
             "30-44",
-            "45-59",
-            "60-89",
-            "90-179",
-            "180-364",
+            "45-60",
+            // "60-89",
+            // "90-179",
+            "60-364",
             "365+",
           ];
 
@@ -1242,10 +1254,10 @@ const fetchCaseDetailsById = async (id) => {
     { key: "ab0_14", label: "0-14" },
     { key: "ab15_29", label: "15-29" },
     { key: "ab30_44", label: "30-44" },
-    { key: "ab45_59", label: "45-59" },
-    { key: "ab60_89", label: "60-89" },
-    { key: "ab90_179", label: "90-179" },
-    { key: "ab180_364", label: "180-364" },
+    { key: "ab45_60", label: "45-60" },
+    // { key: "ab60_89", label: "60-89" },
+    // { key: "ab90_179", label: "90-179" },
+    { key: "ab60_364", label: "60-364" },
     { key: "ab365_Plus", label: "365+" },
     { key: "total", label: "Total" },
   ];
@@ -1406,17 +1418,6 @@ const fetchCaseDetailsById = async (id) => {
                       fontSize: "14px",
                     }}
                   >
-                    <h4
-                      style={{
-                        marginTop: "0px",
-                        marginBottom: "16px",
-                        color: "#003b70",
-                        fontWeight: "600",
-                      }}
-                    >
-                      Case Summary
-                    </h4>
-
                     {caseStatusCt && (() => {
                       const {
                         total_Count: total,
@@ -1426,6 +1427,7 @@ const fetchCaseDetailsById = async (id) => {
                         pended,
                         fFup_Sent,
                         completed,
+                        newAssigned,
 
                         open_NonCompliant,
                         pended_NonCompliant,
@@ -1433,6 +1435,7 @@ const fetchCaseDetailsById = async (id) => {
                         fFup_Sent_NonCompliant,
                         assigned_NonCompliant,
                         unassigned_NonCompliant,
+                        newAssigned_NonCompliant,
 
                         open_PreService,
                         pended_PreService,
@@ -1440,6 +1443,7 @@ const fetchCaseDetailsById = async (id) => {
                         fFup_Sent_PreService,
                         assigned_PreService,
                         unassigned_PreService,
+                        newAssigned_PreService,
 
                         open_PG,
                         pended_PG,
@@ -1447,6 +1451,7 @@ const fetchCaseDetailsById = async (id) => {
                         fFup_Sent_PG,
                         assigned_PG,
                         unassigned_PG,
+                        newAssigned_PG,
 
                         total_NonCompliant_Yes,
                         total_PreService,
@@ -1459,43 +1464,51 @@ const fetchCaseDetailsById = async (id) => {
                         <div style={{ display: "flex", flexWrap: "wrap", columnGap: "5%", rowGap: "16px" }}>
                           {/* Left Column */}
                           <div style={{ flex: "1 1 45%" }}>
+                            <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "8px" }}>Case Summary</div>
                             <div>📁 Total Cases: <strong>{total}</strong></div>
                             <div>🚀 Assigned: <strong>{assigned}</strong></div>
                             <div>❔ Unassigned: <strong>{unassigned}</strong></div>
+                            <div>🆕 New Assigned: <strong>{newAssigned}</strong></div>
                             <div>🟡 Pended: <strong>{pended}</strong></div>
-                            <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
-                            <div>📂 Open/Pend: <strong>{open}</strong></div>
+                            {/* <div>📂 Open/Pend: <strong>{open}</strong></div> */}
                             <div>✅ Completed: <strong>{completed}</strong></div>
+                            <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
 
-                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px" }}>🟦 Pre-Service Cases</div>
-                            <div>📂 Open/Pend: <strong>{open_PreService}</strong></div>
+                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px", marginBottom: "8px" }}>🟦 Pre-Service Cases</div>
+                            {/* <div>📂 Open/Pend: <strong>{open_PreService}</strong></div> */}
+                             <div>📊 Total Pre-Service: <strong>{total_PreService}</strong></div>
+                               <div>🚀 Assigned: <strong>{assigned_PreService}</strong></div>
+                            <div>❔ Unassigned: <strong>{unassigned_PreService}</strong></div>
+                            <div>🆕 New Assigned: <strong>{newAssigned_PreService}</strong></div>
                             <div>🟡 Pended: <strong>{pended_PreService}</strong></div>
                             <div>✅ Completed: <strong>{completed_PreService}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_PreService}</strong></div>
-                            <div>🚀 Assigned: <strong>{assigned_PreService}</strong></div>
-                            <div>❔ Unassigned: <strong>{unassigned_PreService}</strong></div>
-                            <div>📊 Total Pre-Service: <strong>{total_PreService}</strong></div>
+                          
                           </div>
 
                           {/* Right Column */}
                           <div style={{ flex: "1 1 45%" }}>
-                            <div style={{ fontWeight: "600", color: "#003b70" }}>🔴 Non-Compliant(Yes) Cases</div>
-                            <div>📂 Open/Pend: <strong>{open_NonCompliant}</strong></div>
+                            <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "8px" }}>🔴 Non-Compliant(Yes) Cases</div>
+                            {/* <div>📂 Open/Pend: <strong>{open_NonCompliant}</strong></div> */}
+                              <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
+                               <div>🚀 Assigned: <strong>{assigned_NonCompliant}</strong></div>
+                            <div>❔ Unassigned: <strong>{unassigned_NonCompliant}</strong></div>
+                            <div>🆕 New Assigned: <strong>{newAssigned_NonCompliant}</strong></div>
                             <div>🟡 Pended: <strong>{pended_NonCompliant}</strong></div>
                             <div>✅ Completed: <strong>{completed_NonCompliant}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_NonCompliant}</strong></div>
-                            <div>🚀 Assigned: <strong>{assigned_NonCompliant}</strong></div>
-                            <div>❔ Unassigned: <strong>{unassigned_NonCompliant}</strong></div>
-                            <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
+                           
+                            
 
-                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px" }}>🟩 PG(Yes) Cases</div>
-                            <div>📂 Open/Pend: <strong>{open_PG}</strong></div>
+                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px", marginBottom: "8px" }}>🟩 PG(Yes) Cases</div>
+                            {/* <div>📂 Open/Pend: <strong>{open_PG}</strong></div> */}
+                            <div>📊 Total PG: <strong>{total_PG_Yes}</strong></div>
+                             <div>🚀 Assigned: <strong>{assigned_PG}</strong></div>
+                            <div>❔ Unassigned: <strong>{unassigned_PG}</strong></div>
+                            <div>🆕 New Assigned: <strong>{newAssigned_PG}</strong></div>
                             <div>🟡 Pended: <strong>{pended_PG}</strong></div>
                             <div>✅ Completed: <strong>{completed_PG}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_PG}</strong></div>
-                            <div>🚀 Assigned: <strong>{assigned_PG}</strong></div>
-                            <div>❔ Unassigned: <strong>{unassigned_PG}</strong></div>
-                            <div>📊 Total PG: <strong>{total_PG_Yes}</strong></div>
                           </div>
 
                           {/* Full-Width Completion Rate */}
@@ -1651,9 +1664,9 @@ const fetchCaseDetailsById = async (id) => {
                     <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "left", fontWeight: "600" }}>
                       Owner Name
                     </th>
-                    <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                    {/* <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
                       Pend
-                    </th>
+                    </th> */}
                     <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
                       Pended
                     </th>
@@ -1665,6 +1678,9 @@ const fetchCaseDetailsById = async (id) => {
                     </th>
                     <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
                       Assigned
+                    </th>
+                     <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
+                      New Assigned
                     </th>
                     <th style={{ padding: "12px 8px", border: "1px solid #ccc", textAlign: "center", fontWeight: "600" }}>
                       Unassigned
@@ -1689,9 +1705,9 @@ const fetchCaseDetailsById = async (id) => {
                       <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "left" }}>
                         {agent.ownerName}
                       </td>
-                      <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                      {/* <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
                         {agent.open || 0}
-                      </td>
+                      </td> */}
                       <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
                         {agent.pended || 0}
                       </td>
@@ -1703,6 +1719,9 @@ const fetchCaseDetailsById = async (id) => {
                       </td>
                       <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
                         {agent.assigned || 0}
+                      </td>
+                        <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
+                        {agent.newAssigned || 0}
                       </td>
                       <td style={{ padding: "10px 8px", border: "1px solid #eee", textAlign: "center" }}>
                         {agent.unassigned || 0}
@@ -1762,6 +1781,7 @@ const fetchCaseDetailsById = async (id) => {
           <option value="">All</option>
           <option value="Pend">Pend</option>
           <option value="Pended">Pended</option>
+          <option value="New Assigned">New Assigned</option>
           <option value="Completed">Completed</option>
           <option value="FFup Sent">FFup Sent</option>
         </select>
@@ -2602,7 +2622,7 @@ const fetchCaseDetailsById = async (id) => {
                 OWNER_HELPER: "ASSIGNED"
               };
             });
-            handleUpdateAssignedStatus({ status: "Open" });
+            handleUpdateAssignedStatus({ status: "New Assigned" });
             handleAssignCases({ status: "Assigned" });
             handleReassignAppeals();
             setPreserviceRows(updated);

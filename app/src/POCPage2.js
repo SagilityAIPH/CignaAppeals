@@ -51,10 +51,10 @@ let SAMPLE_GNB_SUMMARY = [
     "0-14": 0,
     "15-29": 0,
     "30-44": 0,
-    "45-59": 0,
-    "60-89": 0,
-    "90-179": 0,
-    "180-364": 0,
+    "45-60": 0,
+    // "60-89": 0,
+    // "90-179": 0,
+    "60-364": 0,
     "365+": 0,
     Total: 0,
   },
@@ -64,10 +64,10 @@ const AGE_BUCKETS = [
   "0-14",
   "15-29",
   "30-44",
-  "45-59",
-  "60-89",
-  "90-179",
-  "180-364",
+  "45-60",
+  // "60-89",
+  // "90-179",
+  "60-364",
   "365+",
 ];
 
@@ -77,9 +77,9 @@ const getColorForBucket = (index) => {
     "#66BB6A",
     "#42A5F5",
     "#FFA726",
-    "#FB8C00",
-    "#F4511E",
-    "#EF5350",
+    // "#FB8C00",
+    // "#F4511E",
+    // "#EF5350",
     "#E53935",
     "#B71C1C",
   ];
@@ -111,6 +111,8 @@ function POCPage() {
   const [caseStatusFilter, setCaseStatusFilter] = useState("All");
   const [assignmentFilter, setAssignmentFilter] = useState("All");
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
+  const [managerFilter, setManagerFilter] = useState("All");
+  const [managerList, setManagerList] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedRow, setSelectedRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -646,6 +648,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
       claim_system: claimSystemParam,
       account: accountParam,
+      manager: managerFilter === 'All' ? '' : managerFilter,
       ...prioritizationPayload
     };
     
@@ -696,10 +699,11 @@ useEffect(() => {
     fetchCasesPage(1, pageSize)
     fetchAgeBuckets();
     fetchCaseStatusCt();
+    fetchManagers();
   } else {
     console.log('⏳ Waiting for account to be available before applying filters...');
   }
-}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, claimSystemParam, accountParam, pageSize]); // Include account
+}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, managerFilter, claimSystemParam, accountParam, pageSize]); // Include account
 
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
@@ -727,6 +731,7 @@ useEffect(() => {
     fetchAgeBuckets()
     fetchCasesPage(1, pageSize)
     fetchCaseStatusCt()
+    fetchManagers()
     setUploadComplete(true); // Reset upload state on mount
   } else {
     console.log('⏳ Waiting for account to be available before fetching data...');
@@ -909,6 +914,7 @@ const handleRefresh = async () => {
     setAssignmentFilter("All");
     setCaseStatusFilter("All");
     setPrioritizationFilter("");
+    setManagerFilter("All");
     setCurrentPage(1);
     setPageSize(10);
     setSelectedRows([]);
@@ -920,7 +926,8 @@ const handleRefresh = async () => {
     await Promise.all([
       fetchCasesPage(1, 10),
       fetchAgeBuckets(),
-      fetchCaseStatusCt()
+      fetchCaseStatusCt(),
+      fetchManagers()
     ]);
     
     console.log("Data refreshed successfully");
@@ -974,8 +981,11 @@ const handleSendSummaryCountEmail = async () => {
 const handleExtractExcel = async () => {
   try {
     const response = await axios.get(`${exportAPI}export_appeals`, {
-      responseType: 'blob', // Important for file download
-    });
+       responseType: 'blob',
+      params: {
+      account: selectedGsp === "All" ?  "" : selectedGsp// <-- your variable here
+  }
+});
 
     // Try to extract filename from Content-Disposition header
     let filename;
@@ -1070,10 +1080,10 @@ const fetchAgeBuckets = async () => {
         "0-14": item.ab0_14,
         "15-29": item.ab15_29,
         "30-44": item.ab30_44,
-        "45-59": item.ab45_59,
-        "60-89": item.ab60_89,
-        "90-179": item.ab90_179,
-        "180-364": item.ab180_364,
+        "45-60": item.ab45_60,
+        // "60-89": item.ab60_89,
+        // "90-179": item.ab90_179,
+        "60-364": item.ab60_364,
         "365+": item.ab365_Plus,
         Total: item.total
       }))
@@ -1083,6 +1093,40 @@ const fetchAgeBuckets = async () => {
     setAgeSummary([]);
   }
 };
+
+const fetchManagers = async () => {
+  // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
+  if (!accountParam) {
+    if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
+      console.error('❌ BLOCKED: fetchManagers prevented - account parameter required for', account);
+      setManagerList([]);
+      return; // Exit early - don't call API
+    }
+    console.warn('⚠️ fetchManagers called with BLANK parameters for Sagility account');
+  }
+
+  try {
+    const params = { account: selectedGsp === 'All' ? '' : selectedGsp };
+    
+    console.log('✅ fetchManagers called with parameters:', params, 'for account:', account);
+    
+    const res = await axios.get(`${dataApiUrl}get_managers`, {
+      params: params
+    });
+    
+    const data = res.data || [];
+    console.log('API Response from get_managers:', {
+      dataLength: data.length,
+      managers: data
+    });
+
+    setManagerList(data);
+  } catch (error) {
+    console.error("Error fetching managers:", error);
+    setManagerList([]);
+  }
+};
+
 
 
 
@@ -1125,6 +1169,7 @@ const fetchAgeBuckets = async () => {
       setCaseStatusCt([]);
       setAgeSummary([]);
       setSelectedRows([]);
+      setManagerList([]);
       // Reset pagination
       setCurrentPage(1);
       
@@ -1141,9 +1186,11 @@ const fetchAgeBuckets = async () => {
       setCaseStatusCt([]);
       setAgeSummary([]);
       setSelectedRows([]);
+      setManagerList([]);
       setCurrentPage(1);
       setClaimSystemParam(''); // Reset claimSystemParam on cleanup
       setAccountParam(''); // Reset accountParam on cleanup
+      setManagerFilter('All'); // Reset managerFilter on cleanup
     };
   }, []);
 
@@ -1948,6 +1995,7 @@ const caseStatusUpdate = async (status) => {
                             pended,
                             fFup_Sent,
                             completed,
+                            newAssigned,
 
                             open_NonCompliant,
                             pended_NonCompliant,
@@ -1955,6 +2003,7 @@ const caseStatusUpdate = async (status) => {
                             fFup_Sent_NonCompliant,
                             assigned_NonCompliant,
                             unassigned_NonCompliant,
+                            newAssigned_NonCompliant,
 
                             open_PreService,
                             pended_PreService,
@@ -1962,6 +2011,7 @@ const caseStatusUpdate = async (status) => {
                             fFup_Sent_PreService,
                             assigned_PreService,
                             unassigned_PreService,
+                            newAssigned_PreService,
 
                             open_PG,
                             pended_PG,
@@ -1969,6 +2019,7 @@ const caseStatusUpdate = async (status) => {
                             fFup_Sent_PG,
                             assigned_PG,
                             unassigned_PG,
+                            newAssigned_PG,
 
                             total_NonCompliant_Yes,
                             total_PreService,
@@ -1985,45 +2036,53 @@ const caseStatusUpdate = async (status) => {
                                 <div style={{ flex: "1 1 45%" }}>
                                   <div>📁 Total Cases: <strong>{total}</strong></div>
                                   <div>🚀 Assigned: <strong>{assigned}</strong></div>
+                                   <div>🆕 New Assigned: <strong>{newAssigned}</strong></div>
                                   <div>❔ Unassigned: <strong>{unassigned}</strong></div>
                                   <div>🟡 Pended: <strong>{pended}</strong></div>
-                                  <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
-                                  <div>📂 Pend: <strong>{open}</strong></div>
+                                
+                                  {/* <div>📂 Pend: <strong>{open}</strong></div> */}
                                   <div>✅ Completed: <strong>{completed}</strong></div>
+                                    <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
+                            
                                 </div>
 
                                 {/* Right column */}
                                 <div style={{ flex: "1 1 45%" }}>
                                   <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🔴 Non-Compliant(Yes) Cases</div>
-                                  <div>📂 Pend: <strong>{open_NonCompliant}</strong></div>
+                                   <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
+                                  {/* <div>📂 Pend: <strong>{open_NonCompliant}</strong></div> */}
+                                    <div>🚀 Assigned: <strong>{assigned_NonCompliant}</strong></div>
+                                   <div>🆕 New Assigned: <strong>{newAssigned_NonCompliant}</strong></div>
+                                  <div>❔ Unassigned: <strong>{unassigned_NonCompliant}</strong></div>
                                   <div>🟡 Pended: <strong>{pended_NonCompliant}</strong></div>
                                   <div>✅ Completed: <strong>{completed_NonCompliant}</strong></div>
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent_NonCompliant}</strong></div>
-                                  <div>🚀 Assigned: <strong>{assigned_NonCompliant}</strong></div>
-                                  <div>❔ Unassigned: <strong>{unassigned_NonCompliant}</strong></div>
-                                  <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
+                                
+                                 
                                 </div>
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
                                   <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟦 Pre-Service Cases</div>
-                                  <div>📂 Pend: <strong>{open_PreService}</strong></div>
+                                   <div>📊 Total Pre-Service: <strong>{total_PreService}</strong></div>
+                                     <div>🚀 Assigned: <strong>{assigned_PreService}</strong></div>
+                                  <div>🆕 New Assigned: <strong>{newAssigned_PreService}</strong></div>
+                                  <div>❔ Unassigned: <strong>{unassigned_PreService}</strong></div>
+                                  {/* <div>📂 Pend: <strong>{open_PreService}</strong></div> */}
                                   <div>🟡 Pended: <strong>{pended_PreService}</strong></div>
                                   <div>✅ Completed: <strong>{completed_PreService}</strong></div>
-                                  <div>🔔 FFup Sent: <strong>{fFup_Sent_PreService}</strong></div>
-                                  <div>🚀 Assigned: <strong>{assigned_PreService}</strong></div>
-                                  <div>❔ Unassigned: <strong>{unassigned_PreService}</strong></div>
-                                  <div>📊 Total Pre-Service: <strong>{total_PreService}</strong></div>
+                                 <div>🔔 FFup Sent: <strong>{fFup_Sent_PreService}</strong></div>
                                 </div>
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
                                   <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟩 PG(Yes) Cases</div>
-                                  <div>📂 Pend: <strong>{open_PG}</strong></div>
+                                  <div>📊 Total PG: <strong>{total_PG_Yes}</strong></div>
+                                     <div>🚀 Assigned: <strong>{assigned_PG}</strong></div>
+                                  <div>❔ Unassigned: <strong>{unassigned_PG}</strong></div>
+                                  <div>🆕 New Assigned: <strong>{newAssigned_PG}</strong></div>
+                                  {/* <div>📂 Pend: <strong>{open_PG}</strong></div> */}
                                   <div>🟡 Pended: <strong>{pended_PG}</strong></div>
                                   <div>✅ Completed: <strong>{completed_PG}</strong></div>
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent_PG}</strong></div>
-                                  <div>🚀 Assigned: <strong>{assigned_PG}</strong></div>
-                                  <div>❔ Unassigned: <strong>{unassigned_PG}</strong></div>
-                                  <div>📊 Total PG: <strong>{total_PG_Yes}</strong></div>
                                 </div>
                               </div>
 
@@ -2081,10 +2140,12 @@ const caseStatusUpdate = async (status) => {
           }}
         >
           <option value="">All</option>
-          <option value="Open">Open</option>
+          <option value="Pend">Pend</option>  
           <option value="Pended">Pended</option>
+          <option value="Open">Open</option>
           <option value="Completed">Completed</option>
           <option value="FFup Sent">FFup Sent</option>
+          <option value="New Assigned">New Assigned</option>
         </select>
       </div>
 
@@ -2130,6 +2191,35 @@ const caseStatusUpdate = async (status) => {
           <option value="NonCompliant2_Yes">OOC (NonCompliant - YES)</option>
           <option value="PreService">Pre-Service</option>
           <option value="PG_Yes">PG - YES</option>
+        </select>
+      </div>
+
+       {/* Manager Filter */}
+       <div style={{ width: 200 }}>
+        <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4 }}>
+          Filter by Manager:
+        </label>
+        <select
+          value={managerFilter}
+          onChange={(e) => setManagerFilter(e.target.value)}
+          style={{
+            padding: 8,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            width: "100%",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="All">All Managers</option>
+          {managerList && managerList.length > 0 ? (
+            managerList.map((manager, index) => (
+              <option key={index} value={manager}>
+                {manager}
+              </option>
+            ))
+          ) : (
+            <option disabled>No managers available</option>
+          )}
         </select>
       </div>
 
