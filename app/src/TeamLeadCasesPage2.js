@@ -28,8 +28,7 @@ function TeamLeadCasesPage() {
   const managerNameRaw =
     stateFromRoute?.managerNameRaw || stateFromStorage.managerNameRaw;
   const displayManagerName = location.state?.managerNameRaw ?? managerNameRaw;
-  //console.log("Router state:", stateFromRoute);
-  //console.log("Storage fallback:", stateFromStorage);
+
 
   const managerName = (
     location.state?.managerName ||
@@ -87,6 +86,7 @@ function TeamLeadCasesPage() {
   const [totalAppealCases, setTotalAppealCases] = useState(0); 
   const totalPages2 = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
+  const [tableDataSearchTerm, setTableDataSearchTerm] = useState("");
 
   const { teamLeadId } = useUser();
 
@@ -161,7 +161,7 @@ function TeamLeadCasesPage() {
       setDepartmentList(departments);
 
       setAgeBucketData(data);
-      console.log(data);
+
     } catch (error) {
       console.error('Error fetching age bucket summary:', error);
     }
@@ -245,9 +245,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
  
     setTotalAppealCases(totalRecords);
     
-    console.log(data)// ✅ Use this instead
-    console.log(caseTblAll.length + "total length of caseTblAll");
-    console.log(totalRecords + "total length of totalRecords");
+
      // for pagination controls
   } catch (err) {
   
@@ -279,7 +277,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
           ? parseInt(response.headers["x-total-count"])
           : null;
 
-        console.log(totalFromHeader + " Total count");
+
         if (!totalCount) totalCount = totalFromHeader;
 
         allData = [...allData, ...pageData];
@@ -509,7 +507,7 @@ const handleReassignAppeals = async () => {
 
     try {
       const response = await axios.post(`${dataApiEmailUrl}ReassignAppeals`, payload);
-      //console.log(`Email sent to ${agent.agent_name}:`, response.data);
+
     } catch (error) {
       //console.error(`Failed to send email to ${agent.agent_name}:`, error.response?.data || error.message);
     }
@@ -550,12 +548,6 @@ const handleReassignAppeals = async () => {
 
         if (!ids.length) continue;
 
-        console.log("Sending assignment update:", {
-          ids,
-          CignaID: agent.agent,
-          ownerID: agent.agent,
-          ownerName: agent.agent_name
-        });
 
         await axios.post(`${dataApiUrl}appeal_case_assignment_update`, {
           ids,
@@ -610,7 +602,7 @@ const handleSendFollowUpEmails = async () => {
     }
     ownerIdGroups[ownerId].push(row.id);
   });
-  console.log("Checking against agentList:", agentList);
+
   // Process each owner group
   for (const ownerId in ownerIdGroups) {
     const ids = ownerIdGroups[ownerId];
@@ -1170,15 +1162,11 @@ const fetchCaseDetailsById = async (id) => {
             )
           );
 
-          console.log("Sample Row:", fixedData[0]);
-          console.log("Available Keys:", Object.keys(fixedData[0]));
+
 
           // ✅ Set Pre-Service data
           setPreserviceRows(fixedData);
-          console.log(
-            "👀 Sample OwnerNames:",
-            fixedData.map((r) => r["OwnerName"])
-          );
+
           setPreserviceHeaders(normalizedHeaders);
 
           // ✅ Build Total Appeals Summary (filtered by current manager)
@@ -1863,6 +1851,55 @@ const fetchCaseDetailsById = async (id) => {
               </div>
 
           </div>
+          
+          {/* SR Number & Manager Search Input */}
+          <div style={{
+            backgroundColor: "white",
+            padding: "16px 20px",
+            borderRadius: "8px",
+            marginBottom: "12px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+            width: "40%"
+          }}>
+            <label style={{
+              fontWeight: "600",
+              color: "#003b70",
+              display: "block",
+              marginBottom: "8px"
+            }}>
+              Search by SR Number, Manager, or Owner ID:
+            </label>
+            <input
+              type="text"
+              placeholder="Enter SR number, Manager Name, or Owner ID to filter table..."
+              value={tableDataSearchTerm}
+              onChange={(e) => setTableDataSearchTerm(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                fontSize: "14px",
+                fontFamily: "inherit",
+                boxSizing: "border-box"
+              }}
+            />
+            {tableDataSearchTerm && (
+              <div style={{
+                marginTop: "8px",
+                fontSize: "13px",
+                color: "#666"
+              }}>
+                Found {caseTblAll.filter(row => {
+                  const term = tableDataSearchTerm.toUpperCase();
+                  const srMatch = String(row["sr"] || row["SR"] || row["SR."] || "").toUpperCase().includes(term);
+                  const managerMatch = String(row["manager"] || row["Manager"] || "").toUpperCase().includes(term);
+                  const ownerIDMatch = String(row["ownerID"] || row["OwnerID"] || "").toUpperCase().includes(term);
+                  return srMatch || managerMatch || ownerIDMatch;
+                }).length} matching records
+              </div>
+            )}
+          </div>
 
          
 
@@ -1896,7 +1933,7 @@ const fetchCaseDetailsById = async (id) => {
               <button
                 onClick={() => {setShowAssignModal(true)
                    fetchAgents();
-                  console.log('Reassign trigger')
+           
                 }
                 }
                disabled={selectedRows.length === 0}  
@@ -2061,7 +2098,16 @@ const fetchCaseDetailsById = async (id) => {
       </td>
     </tr>
   ) : (
-    caseTblAll.map((row, idx) => {
+    caseTblAll
+    .filter(row => {
+      if (tableDataSearchTerm.trim() === '') return true;
+      const term = tableDataSearchTerm.toUpperCase();
+      const srMatch = String(row["sr"] || row["SR"] || row["SR."] || "").toUpperCase().includes(term);
+      const managerMatch = String(row["manager"] || row["Manager"] || "").toUpperCase().includes(term);
+      const ownerIDMatch = String(row["ownerID"] || row["OwnerID"] || "").toUpperCase().includes(term);
+      return srMatch || managerMatch || ownerIDMatch;
+    })
+    .map((row, idx) => {
       const isChecked = selectedRows.some(
         (selected) => selected["id"] === row["id"]
       );
@@ -2505,7 +2551,7 @@ const fetchCaseDetailsById = async (id) => {
               // Extract first name for sorting
               const getFirstName = (agent) => {
                 const fullName = agent.agent_name_withId;
-                console.log("Original fullName:", fullName); // Debug log
+              // Debug log
                 
                 // Check if it's already in "(CODE) NAME" format or "NAME (CODE)" format
                 let nameAfterCode = '';
@@ -2526,7 +2572,7 @@ const fetchCaseDetailsById = async (id) => {
                 
                 // Get the first word (first name)
                 const firstName = nameAfterCode.split(' ')[0];
-                console.log("Extracted firstName:", firstName); // Debug log
+ // Debug log
                 return firstName.toLowerCase();
               };
               

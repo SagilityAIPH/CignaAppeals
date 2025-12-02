@@ -123,6 +123,7 @@ function POCPage() {
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [showFollowToast, setShowFollowToast] = useState(false);
   const [agentSearchTerm, setAgentSearchTerm] = useState("");
+  const [tableDataSearchTerm, setTableDataSearchTerm] = useState("");
   const [caseTblAllPoc, setCaseTblAllPoc] = useState([]);
 const [casesData, setCasesData] = useState([]);
 const [totalAppealCases, setTotalAppealCases] = useState([]);
@@ -147,38 +148,8 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   const [caseStatusCt, setCaseStatusCt] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-  // Debug: Track when important state variables change
-  useEffect(() => {
-    console.log('State Update - caseTblAllPoc changed:', {
-      length: caseTblAllPoc?.length,
-      first3: caseTblAllPoc?.slice(0, 3)
-    });
-  }, [caseTblAllPoc]);
-
-  useEffect(() => {
-    console.log('State Update - caseStatusCt changed:', caseStatusCt);
-  }, [caseStatusCt]);
-
-  useEffect(() => {
-    console.log('State Update - ageSummary changed:', {
-      length: ageSummary?.length,
-      first3: ageSummary?.slice(0, 3)
-    });
-  }, [ageSummary]);
   const [refreshing, setRefreshing] = useState(false);
   const { pocId, account } = useUser();
-
-  // Debug: Log the account value from UserContext and user data
-  useEffect(() => {
-    console.log('POCPage2 - Account from UserContext:', account);
-    console.log('POCPage2 - User from UserContext:', user);
-    
-    // If we don't have an account but we have user data, try to derive or fetch account
-    if (!account && user?.agentID) {
-      console.log('No account found, but user exists. May need to fetch account from API or derive from user data');
-      // TODO: Add logic to fetch account from API based on user.agentID or other user properties
-    }
-  }, [account, user]);
 
   // Helper functions for agent name formatting and sorting
   const formatAgentName = (agentName) => {
@@ -525,7 +496,7 @@ const fetchAgents = async () => {
 
     setAgentList(matchedAgents);
   } catch (error) {
-    console.error("Failed to fetch or filter agents by account", error);
+    // Failed to fetch agents
   }
 };
 
@@ -562,10 +533,7 @@ const fetchCasesAll = async () => {
     if (err.response?.status === 404) {
       setCaseTblAllPoc([]);
       setTotalAppealCases(0);
-    } else {
-      console.error("Error fetching all pages:", err);
     }
-    console.error("Error fetching all pages:", err);
   } 
 };
 
@@ -612,13 +580,11 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
   // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
   if (!claimSystemParam && !accountParam) {
     if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
-      console.error('❌ BLOCKED: API call prevented - account parameter required for', account);
       setIsLoading(false);
       setCaseTblAllPoc([]);
       setTotalAppealCases(0);
       return; // Exit early - don't call API
     }
-    console.warn('⚠️ fetchCasesPage called with BLANK parameters for Sagility account');
   }
 
   // Map selected prioritization value to backend params
@@ -652,34 +618,19 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       ...prioritizationPayload
     };
     
-    console.log('✅ fetchCasesPage called with parameters:', apiPayload, 'for account:', account);
-    
-    console.log('API Request to cases_tbl_all_poc with payload:', apiPayload);
-    
     const res = await axios.post(
       `${dataApiUrl}cases_tbl_all_poc?pageNumber=${page}&pageSize=${size}`,
       apiPayload
     );
 
     const { totalRecords, data } = res.data;
-    console.log('API Response from cases_tbl_all_poc:', {
-      totalRecords,
-      dataLength: data?.length,
-      firstFewRecords: data?.slice(0, 3), // Log first 3 records to see what data we're getting
-      accountsInData: [...new Set(data?.map(item => item.account))] // Show unique accounts in the response data
-    });
-    
-    console.log('Setting state - setCaseTblAllPoc with', data?.length, 'records');
-    console.log('Setting state - setTotalAppealCases to', totalRecords);
-    
+  
     setCaseTblAllPoc(data);
     setTotalAppealCases(totalRecords);
   } catch (err) {
     if (err.response?.status === 404) {
       setCaseTblAllPoc([]);
       setTotalAppealCases(0);
-    } else {
-      console.error("Error fetching all pages:", err);
     }
   } finally {
     setIsLoading(false);
@@ -694,21 +645,21 @@ const didMountRef = useRef(false);
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
   if (account) {
-    console.log('🔄 Filter change detected with account:', account, 'parameters:', { claimSystemParam, accountParam });
+   
     setCurrentPage(1);
     fetchCasesPage(1, pageSize)
     fetchAgeBuckets();
     fetchCaseStatusCt();
     fetchManagers();
   } else {
-    console.log('⏳ Waiting for account to be available before applying filters...');
+
   }
 }, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, managerFilter, claimSystemParam, accountParam, pageSize]); // Include account
 
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
   if (account) {
-    console.log('📄 Page change detected with account:', account, 'page:', currentPage);
+   
     fetchCasesPage(currentPage, pageSize);
   }
 }, [account, currentPage, pageSize, claimSystemParam, accountParam]); // Include account
@@ -727,24 +678,24 @@ const location = useLocation();
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
   if (account) {
-    console.log('🚀 Initial data fetch triggered with account:', account, 'claimSystemParam:', claimSystemParam, 'accountParam:', accountParam);
+
     fetchAgeBuckets()
     fetchCasesPage(1, pageSize)
     fetchCaseStatusCt()
     fetchManagers()
     setUploadComplete(true); // Reset upload state on mount
   } else {
-    console.log('⏳ Waiting for account to be available before fetching data...');
+   
   }
 }, [account, claimSystemParam, accountParam, pageSize]); // Include account as dependency
 
 // Set default dropdown values based on user account
 useEffect(() => {
-  console.log('useEffect for account defaults triggered. Account:', account);
+
   if (account) {
     // Set defaults based on account type
     if (account.toLowerCase() === 'concentrix') {
-      console.log('Setting Concentrix defaults: Proclaim, Concentrix');
+     
       // Concentrix users: force to their only options
       setSelectedReport('Proclaim');
       setSelectedGsp('Concentrix');
@@ -752,7 +703,7 @@ useEffect(() => {
       setClaimSystemParam('Proclaim');
       setAccountParam('Concentrix');
     } else if (account.toLowerCase() === 'wipro') {
-      console.log('Setting Wipro defaults: Facets, Wipro');
+
       // Wipro users: force to their only options
       setSelectedReport('Facets');
       setSelectedGsp('Wipro');
@@ -760,7 +711,7 @@ useEffect(() => {
       setClaimSystemParam('Facets');
       setAccountParam('Wipro');
     } else if (account.toLowerCase() === 'sagility') {
-      console.log('Setting Sagility defaults: All, All');
+     
       // Sagility users: set to All to give them full access
       setSelectedReport('All');
       setSelectedGsp('All');
@@ -785,10 +736,7 @@ useEffect(() => {
       }
     })();
     
-    console.log('🔧 Updating claimSystemParam (with account):', selectedReport, '->', newClaimSystemParam, 'account:', account);
     setClaimSystemParam(newClaimSystemParam);
-  } else {
-    console.log('⏸️ Skipping claimSystemParam update (no account):', selectedReport);
   }
 }, [selectedReport, account]); // Include account as dependency
 
@@ -807,10 +755,7 @@ useEffect(() => {
       }
     })();
     
-    console.log('🔧 Updating accountParam (with account):', selectedGsp, '->', newAccountParam, 'account:', account);
     setAccountParam(newAccountParam);
-  } else {
-    console.log('⏸️ Skipping accountParam update (no account):', selectedGsp);
   }
 }, [selectedGsp, account]); // Include account as dependency
 
@@ -873,23 +818,17 @@ const fetchCaseStatusCt = async () => {
   // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
   if (!claimSystemParam && !accountParam) {
     if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
-      console.error('❌ BLOCKED: fetchCaseStatusCt prevented - account parameter required for', account);
       setCaseStatusCt(null);
       return; // Exit early - don't call API
     }
-    console.warn('⚠️ fetchCaseStatusCt called with BLANK parameters for Sagility account');
   }
 
   try {
     const params = { claim_system: claimSystemParam, account: accountParam };
     
-    console.log('✅ fetchCaseStatusCt called with parameters:', params, 'for account:', account);
-    
     const res = await axios.get(`${dataApiUrl}get_cases_status_ct_poc`, {
       params: params
     });
-
-    console.log('API Response from get_cases_status_ct_poc:', res.data);
 
     if (res.data) {
       setCaseStatusCt(res.data);
@@ -897,7 +836,6 @@ const fetchCaseStatusCt = async () => {
       setCaseStatusCt(null);
     }
   } catch (error) {
-    console.error("Failed to fetch case status:", error);
     setCaseStatusCt(null);
   }
 };
@@ -930,11 +868,8 @@ const handleRefresh = async () => {
       fetchManagers()
     ]);
     
-    console.log("Data refreshed successfully");
-    
   } catch (error) {
-    console.error("Error refreshing data:", error);
-    // Optional: Add user notification
+    // Error refreshing data
   } finally {
 
      setRefreshing(false);
@@ -951,8 +886,7 @@ const handleAutoEmail = async () => {
       alert("⚠️ Something went wrong. Please try again.");
     }
   } catch (error) {
-    console.error("Error sending auto emails:", error);
-    alert("❌ Failed to send appeals emails. Check the console for details.");
+    alert("❌ Failed to send appeals emails.");
   }
 };
 
@@ -972,8 +906,7 @@ const handleSendSummaryCountEmail = async () => {
       alert("⚠️ Something went wrong. Please try again.");
     }
   } catch (error) {
-    console.error("Error sending auto emails:", error);
-    alert("❌ Failed to send appeals emails. Check the console for details.");
+    alert("❌ Failed to send appeals emails.");
   }
 };
 
@@ -1014,7 +947,6 @@ const handleExtractExcel = async () => {
     window.URL.revokeObjectURL(url);
   } catch (error) {
     alert('Failed to export Excel file.');
-    console.error(error);
   }
 };
 
@@ -1030,7 +962,6 @@ const fetchCaseDetailsById = async (id) => {
     const response = await axios.get(`${dataApiUrl}cases_view_per_id/${id}`);
     return response.data;
   } catch (error) {
-    console.error("Failed to fetch case details:", error);
     return null;
   }
 };
@@ -1039,29 +970,20 @@ const fetchAgeBuckets = async () => {
   // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
   if (!claimSystemParam && !accountParam) {
     if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
-      console.error('❌ BLOCKED: fetchAgeBuckets prevented - account parameter required for', account);
       setAgeSummary([]);
       setDepartmentList([]);
       return; // Exit early - don't call API
     }
-    console.warn('⚠️ fetchAgeBuckets called with BLANK parameters for Sagility account');
   }
 
   try {
     const params = { claim_system: claimSystemParam, account: accountParam };
-    
-    console.log('✅ fetchAgeBuckets called with parameters:', params, 'for account:', account);
     
     const res = await axios.get(`${dataApiUrl}get_age_bucket_poc`, {
       params: params
     });
     
     const data = res.data || [];
-    console.log('API Response from get_age_bucket_poc:', {
-      dataLength: data.length,
-      firstFewRecords: data.slice(0, 3),
-      accountsInData: [...new Set(data.map(item => item.account))]
-    });
 
     // For filtering
     const departments = [
@@ -1089,7 +1011,6 @@ const fetchAgeBuckets = async () => {
       }))
     );
   } catch (error) {
-    console.error("Error fetching age bucket summary:", error);
     setAgeSummary([]);
   }
 };
@@ -1098,31 +1019,22 @@ const fetchManagers = async () => {
   // 🛡️ GUARD: Prevent API calls with blank parameters for specific accounts
   if (!accountParam) {
     if (account === 'Concentrix' || account === 'Wipro' || account === 'Onshore') {
-      console.error('❌ BLOCKED: fetchManagers prevented - account parameter required for', account);
       setManagerList([]);
       return; // Exit early - don't call API
     }
-    console.warn('⚠️ fetchManagers called with BLANK parameters for Sagility account');
   }
 
   try {
     const params = { account: selectedGsp === 'All' ? '' : selectedGsp };
-    
-    console.log('✅ fetchManagers called with parameters:', params, 'for account:', account);
     
     const res = await axios.get(`${dataApiUrl}get_managers`, {
       params: params
     });
     
     const data = res.data || [];
-    console.log('API Response from get_managers:', {
-      dataLength: data.length,
-      managers: data
-    });
 
     setManagerList(data);
   } catch (error) {
-    console.error("Error fetching managers:", error);
     setManagerList([]);
   }
 };
@@ -1163,7 +1075,6 @@ const fetchManagers = async () => {
   // Clear all data when account changes to prevent showing cached data from previous account
   useEffect(() => {
     if (account) {
-      console.log('🔄 Account changed to:', account, '- Clearing cached data');
       // Clear all data states to force fresh fetch for the new account
       setCaseTblAllPoc([]);
       setCaseStatusCt([]);
@@ -1172,15 +1083,12 @@ const fetchManagers = async () => {
       setManagerList([]);
       // Reset pagination
       setCurrentPage(1);
-      
-      console.log('✅ Account change cleanup complete. Fresh data will be fetched by other useEffects.');
     }
   }, [account]); // Only depend on account
 
   // Cleanup function when component unmounts to clear any remaining state
   useEffect(() => {
     return () => {
-      console.log('🧹 POCPage2 component unmounting - clearing all state');
       // This will run when the component is unmounted (e.g., when user logs out)
       setCaseTblAllPoc([]);
       setCaseStatusCt([]);
@@ -1206,7 +1114,6 @@ const fetchManagers = async () => {
     const file = e.target.files[0];
     if (!file) return;
   
-    console.log("Selected file:", file.name);
     setSelectedFileName(file.name);
   
   
@@ -1252,10 +1159,10 @@ const fetchManagers = async () => {
    const issueAppeals = async () => {
     axios.get(serverAPI + 'api/AppealsIssue/')
     .then(res => {
-        console.log("Project data loaded successfully:", res.data);
+        // Success
     })
     .catch(err => {
-        console.error("Error loading project data:", err);
+        // Error
     });
   };
 
@@ -1283,9 +1190,8 @@ const fetchManagers = async () => {
       //await fetchCasesAll();
       await fetchCasesPage(1, pageSize);
       await fetchAgeBuckets();
-      console.log("Upload successful:", res.data);
     } catch (err) {
-      console.error("Error uploading file:", err);
+      // Error uploading file
     }
   };
   
@@ -1319,21 +1225,6 @@ const fetchManagers = async () => {
           }
         });
       } catch (error) {
-        console.error("❌ Failed to update status:");
-        
-        if (error.response) {
-          // Server responded with a status outside 2xx
-          console.error("Response status:", error.response.status);
-          console.error("Response data:", error.response.data);
-          console.error("Response headers:", error.response.headers);
-        } else if (error.request) {
-          // Request made but no response received
-          console.error("No response received:", error.request);
-        } else {
-          // Other errors
-          console.error("Error message:", error.message);
-        }
-      
         alert(`Failed to update case status to ${status}.`);
       }
     } 
@@ -1360,14 +1251,6 @@ const fetchManagers = async () => {
         const { agent, ids } = assignment;
 
         if (!ids.length) continue;
-
-        console.log("Sending assignment update:", {
-          ids,
-          status,
-          CignaID: agent.agent,
-          ownerID: agent.agent,
-          ownerName: agent.agent_name
-        });
 
         // ✅ Step 1: Update assignment in database
         await axios.post(`${dataApiUrl}appeal_case_assignment_update`, {
@@ -1399,9 +1282,7 @@ const fetchManagers = async () => {
 
         try {
           await axios.post(`${dataApiEmailUrl}ReassignAppeals`, emailPayload);
-          console.log(`✅ Reassignment email sent to ${agent.agent_name_withId}`);
         } catch (emailError) {
-          console.error(`❌ Failed to send reassignment email to ${agent.agent_name_withId}:`, emailError.response?.data || emailError.message);
           // Continue even if email fails - assignment already succeeded
         }
          
@@ -1421,7 +1302,6 @@ const fetchManagers = async () => {
     }
 
   } catch (error) {
-    console.error(`Failed to update case status to ${status}:`, error);
     alert(`Failed to update case status to ${status}.`);
   }
 };
@@ -1448,7 +1328,6 @@ const fetchManagers = async () => {
     selectedRows.forEach(row => {
       const ownerId = row.ownerID;
       if (!ownerId) {
-        console.warn("Missing ownerID in row:", row);
         return;
       }
   
@@ -1457,7 +1336,6 @@ const fetchManagers = async () => {
       }
       ownerIdGroups[ownerId].push(row.id);
     });
-    console.log("Checking against agentList:", agentList);
     
     let emailsSentSuccessfully = false;
     
@@ -1469,7 +1347,6 @@ const fetchManagers = async () => {
         // Find the matching agent data
         const agentData = agentList.find(agent => agent.agent?.toUpperCase() === ownerId.toUpperCase());
         if (!agentData) {
-          console.warn(`No agent data found for ownerID: ${ownerId}`);
           continue;
         }
     
@@ -1498,7 +1375,6 @@ const fetchManagers = async () => {
           setShowFollowToast(true);
     
         } catch (err) {
-          console.error(`Error for ownerID ${ownerId}`, err);
           // Continue processing other owners even if one fails
         }
       }
@@ -1511,7 +1387,7 @@ const fetchManagers = async () => {
           await fetchCasesPage(currentPage, pageSize);
           await fetchCaseStatusCt();
         } catch (err) {
-          console.error("Error updating status", err);
+          // Error updating status
         }
       }
     }
@@ -1576,8 +1452,7 @@ const handleReassignAppeals = async () => {
     };
 
     try {
-      const response = await axios.post(serverAPI + 'api/AppealsEmail/FollowUpAppeals2', payload);
-      console.log('Server Response:', response.data);
+      await axios.post(serverAPI + 'api/AppealsEmail/FollowUpAppeals2', payload);
     } catch (error) {
       console.error('API Error:', error);
     }
@@ -1592,10 +1467,9 @@ const handleReassignAppeals = async () => {
     };
 
     try {
-      const response = await axios.post(serverAPI + 'api/AppealsEmail/ReassignAppeals2', payload);
-      console.log('Server Response:', response.data);
+      await axios.post(serverAPI + 'api/AppealsEmail/ReassignAppeals2', payload);
     } catch (error) {
-      console.error('API Error:', error);
+      // Error
     }
   };
 
@@ -1606,10 +1480,9 @@ const handleReassignAppeals = async () => {
     };
 
     try {
-      const response = await axios.post(serverAPI + 'api/AppealsEmail/appeals_main_followup', payload);
-      console.log('Server Response:', response.data);
+      await axios.post(serverAPI + 'api/AppealsEmail/appeals_main_followup', payload);
     } catch (error) {
-      console.error('API Error:', error);
+      // Error
     }
   };
 
@@ -1621,21 +1494,19 @@ const handleReassignAppeals = async () => {
     };
 
     try {
-      const response = await axios.post(serverAPI + '/api/AppealsIssue/appeal_case_assignment_update', payload);
-      console.log('Server Response:', response.data);
+      await axios.post(serverAPI + '/api/AppealsIssue/appeal_case_assignment_update', payload);
     } catch (error) {
-      console.error('API Error:', error);
+      // Error
     }
   };
 const caseStatusUpdate = async (status) => {
   try {
-    const response = await axios.post(
+    await axios.post(
       `${serverAPI}/api/AppealsIssue/appeal_case_status_update`,
       { status }  // <-- JSON body
     );
-    console.log('Server Response:', response.data);
   } catch (error) {
-    console.error('API Error:', error);
+    // Error
   }
 };
 
@@ -1645,10 +1516,9 @@ const caseStatusUpdate = async (status) => {
     };
 
     try {
-      const response = await axios.post(serverAPI + '/api/AppealsIssue/get_cases_status_ct', payload);
-      console.log('Server Response:', response.data);
+      await axios.post(serverAPI + '/api/AppealsIssue/get_cases_status_ct', payload);
     } catch (error) {
-      console.error('API Error:', error);
+      // Error
     }
   };
 
@@ -1658,19 +1528,17 @@ const caseStatusUpdate = async (status) => {
     };
 
     try {
-      const response = await axios.post(serverAPI + '/api/AppealsIssue/get_age_bucket_poc', payload);
-      console.log('Server Response:', response.data);
+      await axios.post(serverAPI + '/api/AppealsIssue/get_age_bucket_poc', payload);
     } catch (error) {
-      console.error('API Error:', error);
+      // Error
     }
   };
 
   const View = async () => {
     try {
-      const response = await axios.get(serverAPI + '/api/AppealsIssue/cases_view_per_sr/');
-      console.log('Server Response:', response.data);
+      await axios.get(serverAPI + '/api/AppealsIssue/cases_view_per_sr/');
     } catch (error) {
-      console.error('API Error:', error);
+      // Error
     }
   };
 
@@ -2191,6 +2059,12 @@ const caseStatusUpdate = async (status) => {
           <option value="NonCompliant2_Yes">OOC (NonCompliant - YES)</option>
           <option value="PreService">Pre-Service</option>
           <option value="PG_Yes">PG - YES</option>
+          <option value="Admin">Admin</option>
+          <option value="Medical">Medical</option>
+          <option value="Member">Member</option>
+          <option value="Fully Insured">Fully Insured</option>
+          <option value="ASO">ASO</option>
+          <option value="IFP">IFP</option>
         </select>
       </div>
 
@@ -2266,6 +2140,54 @@ const caseStatusUpdate = async (status) => {
   </div>
     </div>
   
+    {/* SR Number & Manager Search Input */}
+    <div style={{
+      backgroundColor: "white",
+      padding: "16px 20px",
+      borderRadius: "8px",
+      marginBottom: "12px",
+      boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+      width: "40%"
+    }}>
+      <label style={{
+        fontWeight: "600",
+        color: "#003b70",
+        display: "block",
+        marginBottom: "8px"
+      }}>
+        Search by SR Number, Manager, or Owner ID:
+      </label>
+      <input
+        type="text"
+        placeholder="Enter SR number, Manager Name, or Owner ID to filter table..."
+        value={tableDataSearchTerm}
+        onChange={(e) => setTableDataSearchTerm(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: "6px",
+          border: "1px solid #ccc",
+          fontSize: "14px",
+          fontFamily: "inherit",
+          boxSizing: "border-box"
+        }}
+      />
+      {tableDataSearchTerm && (
+        <div style={{
+          marginTop: "8px",
+          fontSize: "13px",
+          color: "#666"
+        }}>
+          Found {caseTblAllPoc.filter(row => {
+            const term = tableDataSearchTerm.toUpperCase();
+            const srMatch = String(row["sr"] || row["SR"] || row["SR."] || "").toUpperCase().includes(term);
+            const managerMatch = String(row["manager"] || row["Manager"] || "").toUpperCase().includes(term);
+            const ownerIDMatch = String(row["ownerID"] || row["OwnerID"] || "").toUpperCase().includes(term);
+            return srMatch || managerMatch || ownerIDMatch;
+          }).length} matching records
+        </div>
+      )}
+    </div>
 
     {/* Case Summary & Actions */}
     <div
@@ -2402,8 +2324,16 @@ const caseStatusUpdate = async (status) => {
       </td>
     </tr>
   ) : (
-    sortedCases.
-    map((row, idx) => {
+    sortedCases
+    .filter(row => {
+      if (tableDataSearchTerm.trim() === '') return true;
+      const term = tableDataSearchTerm.toUpperCase();
+      const srMatch = String(row["sr"] || row["SR"] || row["SR."] || "").toUpperCase().includes(term);
+      const managerMatch = String(row["manager"] || row["Manager"] || "").toUpperCase().includes(term);
+      const ownerIDMatch = String(row["ownerID"] || row["OwnerID"] || "").toUpperCase().includes(term);
+      return srMatch || managerMatch || ownerIDMatch;
+    })
+    .map((row, idx) => {
       //const isChecked = selectedRows.some(selected => selected['id'] === row['id']);
 
       return (
