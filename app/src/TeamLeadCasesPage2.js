@@ -226,6 +226,24 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       case 'PreService':
         prioritizationPayload.prioritization = 'Pre-Service';
         break;
+        case 'Admin':
+          prioritizationPayload.prioritization = 'Admin';
+          break;
+        case 'Medical':
+          prioritizationPayload.prioritization = 'Medical';
+          break;
+       case 'Member':
+          prioritizationPayload.prioritization = 'Member';
+          break;
+       case 'ASO':
+          prioritizationPayload.prioritization = 'ASO';
+          break;
+        case 'Fully Insured':
+          prioritizationPayload.prioritization = 'Fully Insured';
+          break;
+       case 'IFP':
+          prioritizationPayload.prioritization = 'IFP';
+          break;
       default:
         break;
     }
@@ -1816,6 +1834,12 @@ const fetchCaseDetailsById = async (id) => {
               <option value="NonCompliant2_Yes">OOC (NonCompliant - YES)</option>
               <option value="PreService">Pre-Service</option>
               <option value="PG_Yes">PG - YES</option>
+              <option value="Admin">Admin</option>
+              <option value="Medical">Medical</option>
+              <option value="Member">Member</option>
+              <option value="Fully Insured">Fully Insured</option>
+              <option value="ASO">ASO</option>
+              <option value="IFP">IFP</option>
             </select>
           </div>
 

@@ -604,6 +604,24 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     case 'PreService':
       prioritizationPayload.prioritization = 'Pre-Service';
       break;
+      case 'Admin':
+        prioritizationPayload.prioritization = 'Admin';
+        break;
+      case 'Medical':
+        prioritizationPayload.prioritization = 'Medical';
+        break;
+     case 'Member':
+        prioritizationPayload.prioritization = 'Member';
+        break;
+     case 'ASO':
+        prioritizationPayload.prioritization = 'ASO';
+        break;
+      case 'Fully Insured':
+        prioritizationPayload.prioritization = 'Fully Insured';
+        break;
+     case 'IFP':
+        prioritizationPayload.prioritization = 'IFP';
+        break;
     default:
       break;
   }
