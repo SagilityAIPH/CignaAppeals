@@ -87,6 +87,7 @@ function TeamLeadCasesPage() {
   const totalPages2 = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
   const [tableDataSearchTerm, setTableDataSearchTerm] = useState("");
+  const [activeAppealCasesTab, setActiveAppealCasesTab] = useState("appealCases");
 
   const { teamLeadId } = useUser();
 
@@ -1756,17 +1757,60 @@ const fetchCaseDetailsById = async (id) => {
             fontFamily: "Lexend, sans-serif",
           }}
         >
-          <h3
-            style={{
-              fontSize: "19px",
-              fontWeight: "500",
-              color: "#003b70",
-              marginBottom: "10px",
-              marginTop: "0px",
-            }}
-          >
-            Appeal Cases
-          </h3>
+          <div style={{ display: "flex", borderBottom: "2px solid #ddd", marginBottom: "16px" }}>
+            <button
+              onClick={() => setActiveAppealCasesTab("appealCases")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "appealCases" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "appealCases" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Appeal Cases - {totalAppealCases}
+            </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("assignedByCC")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "assignedByCC" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "assignedByCC" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Assigned by CC
+            </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("pended")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "pended" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "pended" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Pended
+            </button>
+          </div>
+
+          {/* Content wrapper - show for all three tabs */}
+          {(activeAppealCasesTab === "appealCases" || activeAppealCasesTab === "assignedByCC" || activeAppealCasesTab === "pended") && (
+            <>
 
           <div style={{ display: "flex", gap: "16px", marginBottom: "25px" }}>
           <div style={{ width: 200 }}>
@@ -2271,11 +2315,12 @@ const fetchCaseDetailsById = async (id) => {
               </button>
             </div>
           </div>
+          </>
+          )}
         </div>
       )}
 
       
-
       {/* Modal for viewing full row */}
       {showModal && selectedRow && (
         <div

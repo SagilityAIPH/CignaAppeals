@@ -67,6 +67,7 @@ function ClientProclaimPage() {
     const [list, setList] = useState([]);
     const [nonAsoStats,setNonAsoStats] = useState([]);
     const [complianceRawData, setComplianceRawData] = useState([]);
+    const [proclaimCaseStatusPerTeamLeader, setProclaimCaseStatusPerTeamLeader] = useState([]);
 
 const [preservicePage, setPreservicePage] = useState(1);
 const [preservicePageSize, setPreservicePageSize] = useState(20);
@@ -89,6 +90,7 @@ const [selectedPreSerGsp, setSelectedPreSerGsp] = useState('All');
       fetchProclaimPendReasonCt();
       fetchMbrPrv();
       fetchComplianceRawData();
+      fetchCaseStatusPerTeamLeader();
       fetchPgNameSummary();
       fetchNonAsoSummary();
       fetchPreserviceRows(selectedPreSerGsp, preservicePage, preservicePageSize);
@@ -184,6 +186,21 @@ const fetchPreserviceRows = async (gsp, page, size) => {
   }
   setIsPreserviceLoading(false);
 };
+
+// Fetch case status per team leader
+async function fetchCaseStatusPerTeamLeader() {
+  try {
+    const res = await axios.get(`${dataApiUrl}get_cases_status_ct_teamlead_per_agent`);
+    if (res.data) {
+      setProclaimCaseStatusPerTeamLeader(res.data);
+    } else {
+      setProclaimCaseStatusPerTeamLeader([]);
+    }
+  } catch (error) {
+    console.error('Failed to fetch case status per team leader:', error);
+    setProclaimCaseStatusPerTeamLeader([]);
+  }
+}
 
 
 const fetchPgYesRows = async (gsp, page, size) => {
@@ -1845,7 +1862,113 @@ const sortIcon = (col) => {
   </div>
 )}
 
+{/* Case Status Per Team Leader Table */}
+{proclaimCaseStatusPerTeamLeader.length > 0 && (
+  <div
+    style={{
+      marginTop: '20px',
+      marginLeft: '-30px',
+      marginBottom: '20px',
+      backgroundColor: '#F5F6FA',
+      borderRadius: '10px',
+      padding: '20px',
+      fontFamily: 'Lexend, sans-serif',
+    }}
+  >
+    <h3
+      style={{
+        fontSize: '19px',
+        fontWeight: '500',
+        color: '#003b70',
+        marginBottom: '16px',
+        marginTop: '0px',
+      }}
+    >
+      Case Status Per Team Leader
+    </h3>
 
+    <div
+      style={{
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        backgroundColor: 'white',
+      }}
+    >
+      <div
+        style={{
+          maxHeight: '400px',
+          overflowY: 'auto',
+          overflowX: 'auto',
+        }}
+      >
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '13px',
+          }}
+        >
+          <thead
+            style={{
+              backgroundColor: '#00bcd4',
+              color: 'white',
+              position: 'sticky',
+              top: 0,
+              zIndex: 1,
+            }}
+          >
+            <tr>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'left', fontWeight: '600' }}>
+                Owner ID
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'left', fontWeight: '600' }}>
+                Owner Name
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
+                Pended
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
+                Completed
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
+                FFup Sent
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
+                Assigned
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
+                New Assigned
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
+                Unassigned
+              </th>
+              <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
+                Total
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {proclaimCaseStatusPerTeamLeader.map((tl, idx) => (
+              <tr key={`caseStatusTL_${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fbff' }}>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.ownerID}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.ownerName}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.pended || 0}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.completed || 0}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.fFup_Sent || 0}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.assigned || 0}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.newAssigned || 0}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.unassigned || 0}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center', fontWeight: '600' }}>{tl.total_Count || 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
 
 
         {/* Out of Compliance */}
