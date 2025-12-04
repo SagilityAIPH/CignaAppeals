@@ -1997,10 +1997,10 @@ const sortIcon = (col) => {
           >
             <tr>
               <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'left', fontWeight: '600' }}>
-                Owner ID
+                TeamLead ID
               </th>
               <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'left', fontWeight: '600' }}>
-                Owner Name
+                TeamLead Name
               </th>
               <th style={{ padding: '12px 8px', border: '1px solid #ccc', textAlign: 'center', fontWeight: '600' }}>
                 Pended

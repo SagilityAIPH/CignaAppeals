@@ -251,8 +251,16 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
 
     const teamLeadId_param = teamLeadId;
 
+    // Determine endpoint based on active tab
+    let endpoint = "cases_tbl_all_teamlead";
+    if (activeAppealCasesTab === "assignedByCC") {
+      endpoint = "cases_tbl_all_assigned_by_cc_teamlead";
+    } else if (activeAppealCasesTab === "pended") {
+      endpoint = "cases_tbl_all_pended_teamlead";
+    }
+
   try {
-    const res = await axios.post(`${dataApiUrl}cases_tbl_all_teamlead?pageNumber=${page}&pageSize=${size}`, {
+    const res = await axios.post(`${dataApiUrl}${endpoint}?pageNumber=${page}&pageSize=${size}`, {
       teamlead: teamLeadId_param,
       caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
       assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
@@ -397,7 +405,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     fetchAgeBucketSummary()
     fetchCaseStatusCt()
     fetchCaseStatusPerAgent()
-  }, [caseStatusFilter, assignmentFilter, prioritizationFilter]);
+  }, [caseStatusFilter, assignmentFilter, prioritizationFilter, activeAppealCasesTab]);
 
   useEffect(() => {
     setCurrentPage(1); // Reset page
@@ -1772,7 +1780,8 @@ const fetchCaseDetailsById = async (id) => {
                 transition: "all 0.2s"
               }}
             >
-              Appeal Cases - {totalAppealCases}
+              Overall
+              {/* Overall - {totalAppealCases} */}
             </button>
             <button
               onClick={() => setActiveAppealCasesTab("assignedByCC")}
@@ -1994,7 +2003,11 @@ const fetchCaseDetailsById = async (id) => {
               }}
             >
               {/* Total Appeal Cases: {caseStatusCt[0].total_Count} */}
-              Total Appeal Cases: {totalAppealCases}
+              {activeAppealCasesTab === "assignedByCC"
+                ? `Total Assigned: ${totalAppealCases}`
+                : activeAppealCasesTab === "pended"
+                ? `Total Pended: ${totalAppealCases}`
+                : `Total Appeal Cases: ${totalAppealCases}`}
             </div>
 
             <div style={{ display: "flex", gap: "12px" }}>

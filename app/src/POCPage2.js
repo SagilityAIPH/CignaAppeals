@@ -125,6 +125,8 @@ function POCPage() {
   const [agentSearchTerm, setAgentSearchTerm] = useState("");
   const [tableDataSearchTerm, setTableDataSearchTerm] = useState("");
   const [caseTblAllPoc, setCaseTblAllPoc] = useState([]);
+  const [activeAppealCasesTab, setActiveAppealCasesTab] = useState("appealCases");
+
 const [casesData, setCasesData] = useState([]);
 const [totalAppealCases, setTotalAppealCases] = useState([]);
 const [pageNumber, setPageNumber] = useState(1);
@@ -626,6 +628,14 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       break;
   }
 
+  // Determine endpoint based on active tab
+    let endpoint = "cases_tbl_all_poc";
+    if (activeAppealCasesTab === "assignedByCC") {
+      endpoint = "cases_tbl_all_assigned_by_cc_poc";
+    } else if (activeAppealCasesTab === "pended") {
+      endpoint = "cases_tbl_all_pended_poc";
+    }
+
   try {
     const apiPayload = {
       caseStatus: caseStatusFilter === 'All' ? '' : caseStatusFilter,
@@ -637,7 +647,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     };
     
     const res = await axios.post(
-      `${dataApiUrl}cases_tbl_all_poc?pageNumber=${page}&pageSize=${size}`,
+      `${dataApiUrl}${endpoint}?pageNumber=${page}&pageSize=${size}`,
       apiPayload
     );
 
@@ -672,7 +682,7 @@ useEffect(() => {
   } else {
 
   }
-}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, managerFilter, claimSystemParam, accountParam, pageSize]); // Include account
+}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, managerFilter, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
 
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
@@ -2005,7 +2015,61 @@ const caseStatusUpdate = async (status) => {
       boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
     }}
   >
-    <h3 style={{ marginTop: 0, color: "#003b70" }}>Appeal Cases</h3>
+    <div style={{ display: "flex", borderBottom: "2px solid #ddd", marginBottom: "16px" }}>
+            <button
+              onClick={() => setActiveAppealCasesTab("appealCases")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "appealCases" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "appealCases" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Overall
+              {/* Overall - {totalAppealCases} */}
+            </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("assignedByCC")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "assignedByCC" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "assignedByCC" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Assigned by CC
+            </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("pended")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "pended" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "pended" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Pended
+            </button>
+          </div>
+
+          {/* Content wrapper - show for all three tabs */}
+          {(activeAppealCasesTab === "appealCases" || activeAppealCasesTab === "assignedByCC" || activeAppealCasesTab === "pended") && (
+            <>
 
     {/* Filters */}
     <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
@@ -2221,7 +2285,11 @@ const caseStatusUpdate = async (status) => {
       }}
     >
       <div style={{ fontWeight: 600, color: "#003b70" }}>
-        Total Appeal Cases: {totalAppealCases}
+        {activeAppealCasesTab === "assignedByCC"
+        ? `Total Assigned: ${totalAppealCases}`
+        : activeAppealCasesTab === "pended"
+        ? `Total Pended: ${totalAppealCases}`
+        : `Total Appeal Cases: ${totalAppealCases}`}
       </div>
 
       <div style={{ display: "flex", gap: 12 }}>
@@ -2591,7 +2659,8 @@ const caseStatusUpdate = async (status) => {
       Next
     </button>
   </div>
-
+</>
+)}
   </div>
 )}
 
