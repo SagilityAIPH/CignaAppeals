@@ -148,6 +148,8 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
   const [departmentList, setDepartmentList] = useState([]);
   const [ageSummary, setAgeSummary] = useState([]);
   const [caseStatusCt, setCaseStatusCt] = useState([]);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const [refreshing, setRefreshing] = useState(false);
@@ -634,6 +636,10 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       endpoint = "cases_tbl_all_assigned_by_cc_poc";
     } else if (activeAppealCasesTab === "pended") {
       endpoint = "cases_tbl_all_pended_poc";
+    } else if (activeAppealCasesTab === "completed") { 
+      endpoint = "cases_tbl_all_poc_completed";
+    } else if (activeAppealCasesTab === "followedUp") {
+      endpoint = "cases_tbl_all_poc_followup";
     }
 
   try {
@@ -1339,16 +1345,16 @@ const fetchManagers = async () => {
 
   const handleSendFollowUpEmails = async () => {
     if (!selectedRows || selectedRows.length === 0) {
-      alert("Please select at least one case.");
       return;
     }
 
     const hasUnassigned = selectedRows.some(row => row.case_assignment_status === "Unassigned");
 
     if (hasUnassigned) {
-      alert("One or more selected cases are unassigned. Please assign them before sending follow-up.");
       return;
     }
+
+   
   
     const ownerIdGroups = {};
   
@@ -1364,6 +1370,11 @@ const fetchManagers = async () => {
       }
       ownerIdGroups[ownerId].push(row.id);
     });
+
+    const ownerCount = Object.keys(ownerIdGroups).length;
+    if (ownerCount === 0) {
+      return;
+    }
     
     let emailsSentSuccessfully = false;
     
@@ -1373,10 +1384,13 @@ const fetchManagers = async () => {
         const ids = ownerIdGroups[ownerId];
     
         // Find the matching agent data
+        console.log(agentList);
         const agentData = agentList.find(agent => agent.agent?.toUpperCase() === ownerId.toUpperCase());
         if (!agentData) {
           continue;
         }
+
+  
     
         const payload = {
           id: ids,
@@ -1385,38 +1399,51 @@ const fetchManagers = async () => {
           managerEmail: agentData.manager_CIGNA_Email_Address?.trim() || '',
           agentID: ownerId
         };
+
     
         try {
           // Step 1: Send follow-up email
-      
-          await axios.post(`${dataApiEmailUrl}FollowUpAppeals`, payload);
+
+          const emailResponse = await axios.post(`${dataApiEmailUrl}FollowUpAppeals2`, payload);
+
     
           // Step 2: Update DB
-        
-          await axios.post(`${dataApiUrl}appeals_main_followup`, {
+          const dbResponse = await axios.post(`${dataApiUrl}appeals_main_followup`, {
             ids:  ids,
             cignaID: ownerId,
             sessID: pocId
           });
+   
 
           emailsSentSuccessfully = true;
           setShowFollowToast(true);
     
         } catch (err) {
-          // Continue processing other owners even if one fails
+          // Show detailed error information
+          const errorDetails = {
+            message: err.message,
+            status: err.response?.status,
+            statusText: err.response?.statusText,
+            data: err.response?.data,
+            url: err.config?.url
+          };
         }
       }
     } finally {
       // Step 3: Always update status for all selected rows, even if some emails failed
       if (emailsSentSuccessfully) {
+     
         try {
           await handleUpdateAssignedStatus({ status: "FFup Sent" });
           await fetchAgeBuckets();
           await fetchCasesPage(currentPage, pageSize);
           await fetchCaseStatusCt();
+ 
         } catch (err) {
-          // Error updating status
+       console.log(err.message);
         }
+      } else {
+        console.log(`⚠️ No emails were sent successfully.`);
       }
     }
   };
@@ -1637,6 +1664,40 @@ const caseStatusUpdate = async (status) => {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           {/* <button onClick={handleAutoEmail} style={{ backgroundColor: "#00aaff", color: "white", padding: "10px 18px", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Auto email</button> */}
+        
+        {/* Date Pickers */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <label style={{ fontWeight: 600, color: "#003b70" }}>From:</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              fontSize: 14,
+              fontFamily: "inherit"
+            }}
+          />
+        </div>
+        
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <label style={{ fontWeight: 600, color: "#003b70" }}>To:</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              fontSize: 14,
+              fontFamily: "inherit"
+            }}
+          />
+        </div>
+        
         <button 
           onClick={handleRefresh} 
           disabled={refreshing}
@@ -2003,7 +2064,7 @@ const caseStatusUpdate = async (status) => {
 
 {/*uploadComplete &&*/}
 
-{uploadComplete &&(
+{caseStatusCt &&(
   <div
     style={{
       marginTop: 40,
@@ -2065,10 +2126,42 @@ const caseStatusUpdate = async (status) => {
             >
               Pended
             </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("completed")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "completed" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "completed" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Completed
+            </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("followedUp")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "followedUp" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "followedUp" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Followed Up
+            </button>
           </div>
 
           {/* Content wrapper - show for all three tabs */}
-          {(activeAppealCasesTab === "appealCases" || activeAppealCasesTab === "assignedByCC" || activeAppealCasesTab === "pended") && (
+          {(activeAppealCasesTab === "appealCases" || activeAppealCasesTab === "assignedByCC" || activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp") && (
             <>
 
     {/* Filters */}
@@ -2289,6 +2382,10 @@ const caseStatusUpdate = async (status) => {
         ? `Total Assigned: ${totalAppealCases}`
         : activeAppealCasesTab === "pended"
         ? `Total Pended: ${totalAppealCases}`
+        : activeAppealCasesTab === "completed"
+        ? `Total Completed: ${totalAppealCases}`
+        : activeAppealCasesTab === "followedUp"
+        ? `Total Followed Up: ${totalAppealCases}`
         : `Total Appeal Cases: ${totalAppealCases}`}
       </div>
 
@@ -2322,7 +2419,9 @@ const caseStatusUpdate = async (status) => {
 
 
 <button
-  onClick={() => setShowFollowUpModal(true)}
+  onClick={() => {
+    fetchAgents()
+    setShowFollowUpModal(true)}}
   disabled={selectedRows.length === 0}
   style={{
     backgroundColor: selectedRows.length > 0 ? "#ff9800" : "#aaa",
@@ -3040,21 +3139,9 @@ const caseStatusUpdate = async (status) => {
 
       <div style={{ display: "flex", justifyContent: "center", gap: "16px" }}>
         <button
-          onClick={() => {
-            const updated = preserviceRows.map(row => {
-              const match = selectedRows.some(sel => sel["SR"] === row["SR"]);
-              if (match) {
-                return { ...row, Status: "FFup Sent" };
-              }
-              return row;
-            });
-            handleSendFollowUpEmails();
-            setPreserviceRows(updated);
-            setSelectedRows([]);
+          onClick={async () => {
             setShowFollowUpModal(false);
-            setCurrentPage(1);
-
-            
+            await handleSendFollowUpEmails();
             setTimeout(() => setShowFollowToast(false), 3000);
           }}
           style={{

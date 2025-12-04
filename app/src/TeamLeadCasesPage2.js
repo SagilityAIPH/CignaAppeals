@@ -18,7 +18,7 @@ import { useUser } from "./UserContext";
 
 function TeamLeadCasesPage() {
   const location = useLocation();
-  const { user } = useUser();
+  const { user, account } = useUser();
 
   const stateFromRoute = location.state;
   const stateFromStorage = JSON.parse(
@@ -257,6 +257,10 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       endpoint = "cases_tbl_all_assigned_by_cc_teamlead";
     } else if (activeAppealCasesTab === "pended") {
       endpoint = "cases_tbl_all_pended_teamlead";
+    } else if (activeAppealCasesTab === "completed") { 
+      endpoint = "cases_tbl_all_completed_teamlead";
+    } else if (activeAppealCasesTab === "followedUp") {
+      endpoint = "cases_tbl_all_followup_teamlead";
     }
 
   try {
@@ -634,8 +638,11 @@ const handleSendFollowUpEmails = async () => {
   for (const ownerId in ownerIdGroups) {
     const ids = ownerIdGroups[ownerId];
 
+       const response = await axios.get(`${dataApiUrl}appeals_agents_list?account=${account}`);
+      const agents = response.data || [];
+
     // Find the matching agent data
-    const agentData = agentList.find(agent => agent.agent?.toUpperCase() === ownerId.toUpperCase());
+    const agentData = agents.find(agent => agent.agent?.toUpperCase() === ownerId.toUpperCase());
     if (!agentData) {
       console.warn(`No agent data found for ownerID: ${ownerId}`);
       continue;
@@ -652,7 +659,7 @@ const handleSendFollowUpEmails = async () => {
     try {
       // Step 1: Send follow-up email
   
-      await axios.post(`${dataApiEmailUrl}FollowUpAppeals`, payload);
+      await axios.post(`${dataApiEmailUrl}FollowUpAppeals2`, payload);
 
       // Step 2: Update DB
     
@@ -870,7 +877,7 @@ let caseTblAllColumnMap = {
   ownerID: "Owner ID",
   ownerName: "Owner Name",
   appealStatus: "Status",
-  case_Assignment_Status: "Case Assignment Status",
+  case_assignment_status : "Case Assignment Status",
 };
 
 // 🟦 Append `T-Minus` column if filter is "Pended"
@@ -1327,7 +1334,7 @@ const fetchCaseDetailsById = async (id) => {
 
       {/* Total Appeals Summary Section */}
       {/* Total Appeals Summary Section */}
-      {preserviceRows.length >= 0 && (
+      {caseStatusPerAgent.length >= 0 && (
         <div
           style={{
             marginTop: "0px",
@@ -1815,10 +1822,42 @@ const fetchCaseDetailsById = async (id) => {
             >
               Pended
             </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("completed")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "completed" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "completed" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Completed
+            </button>
+            <button
+              onClick={() => setActiveAppealCasesTab("followedUp")}
+              style={{
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: "600",
+                border: "none",
+                backgroundColor: "transparent",
+                borderBottom: activeAppealCasesTab === "followedUp" ? "3px solid #0071ce" : "none",
+                color: activeAppealCasesTab === "followedUp" ? "#0071ce" : "#666",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Followed Up
+            </button>
           </div>
 
           {/* Content wrapper - show for all three tabs */}
-          {(activeAppealCasesTab === "appealCases" || activeAppealCasesTab === "assignedByCC" || activeAppealCasesTab === "pended") && (
+          {(activeAppealCasesTab === "appealCases" || activeAppealCasesTab === "assignedByCC" || activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp") && (
             <>
 
           <div style={{ display: "flex", gap: "16px", marginBottom: "25px" }}>
@@ -2007,6 +2046,10 @@ const fetchCaseDetailsById = async (id) => {
                 ? `Total Assigned: ${totalAppealCases}`
                 : activeAppealCasesTab === "pended"
                 ? `Total Pended: ${totalAppealCases}`
+                : activeAppealCasesTab === "completed"
+                ? `Total Completed: ${totalAppealCases}`
+                : activeAppealCasesTab === "followedUp"
+                ? `Total Followed Up: ${totalAppealCases}`
                 : `Total Appeal Cases: ${totalAppealCases}`}
             </div>
 
@@ -2032,7 +2075,9 @@ const fetchCaseDetailsById = async (id) => {
               </button>
 
               <button
-                onClick={() => setShowFollowUpModal(true)}
+                onClick={() => {
+                  fetchAgents();
+                  setShowFollowUpModal(true)}}
                 disabled={selectedRows.length === 0}
                 style={{
                   backgroundColor: selectedRows.length > 0 ? "#ff9800" : "#aaa",

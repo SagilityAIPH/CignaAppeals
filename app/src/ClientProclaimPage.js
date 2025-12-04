@@ -190,7 +190,7 @@ const fetchPreserviceRows = async (gsp, page, size) => {
 // Fetch case status per team leader
 async function fetchCaseStatusPerTeamLeader() {
   try {
-    const res = await axios.get(`${dataApiUrl}get_cases_status_ct_teamlead_per_agent`);
+    const res = await axios.get(`${dataApiUrl}get_cases_status_ct_manager`);
     if (res.data) {
       setProclaimCaseStatusPerTeamLeader(res.data);
     } else {
@@ -1952,8 +1952,8 @@ const sortIcon = (col) => {
           <tbody>
             {proclaimCaseStatusPerTeamLeader.map((tl, idx) => (
               <tr key={`caseStatusTL_${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fbff' }}>
-                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.ownerID}</td>
-                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.ownerName}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.teamLead_Id}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.teamLead}</td>
                 <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.pended || 0}</td>
                 <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.completed || 0}</td>
                 <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.fFup_Sent || 0}</td>

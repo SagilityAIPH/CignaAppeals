@@ -1522,6 +1522,21 @@ const ownedRows = preserviceRows.filter(
 <option value="DPL Intake">DPL Intake</option>
 <option value="Mail sent for AOR verification">Mail sent for AOR verification</option>
 <option value="Misroutes">Misroutes</option>
+<option value="Sent for 2nd Touch Escalation">Sent for 2nd Touch Escalation</option>
+<option value="Raised Non-DPL">Raised Non-DPL</option>
+<option value="Sent for CSE Review">Sent for CSE Review</option>
+<option value="Sent for CSE BCC Review">Sent for CSE BCC Review</option>
+<option value="Sent Email for SPD Request">Sent Email for SPD Request</option>
+<option value="Sent Email for NSA">Sent Email for SCO</option>
+<option value="Sent Email for SCO">Sent Email for SCO</option>
+<option value="Sent Email for Evicore Escalation">Sent Email for Evicore Escalation</option>
+<option value="Sent Email FOR QC- QS">Sent Email FOR QC- QS</option>
+<option value="Routed to Alliance">Routed to Alliance</option>
+<option value="Raised MRC Intake">Raised MRC Intake</option>
+<option value="Pended for 2nd Level Appeal">Pended for 2nd Level Appeal</option>
+<option value="Holding for Original SR still not closed">Holding for Original SR still not closed</option>
+<option value="Routed to American Specialty Health Network (ASHN)">Routed to American Specialty Health Network (ASHN)</option>
+<option value="DPL raised for same scenario">DPL raised for same scenario</option>
 
           
         </select>
