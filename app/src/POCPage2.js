@@ -2003,7 +2003,7 @@ const caseStatusUpdate = async (status) => {
 
 {/*uploadComplete &&*/}
 
-{uploadComplete &&(
+{caseStatusCount.length > 0 &&(
   <div
     style={{
       marginTop: 40,

@@ -7,6 +7,7 @@ import {
 import axios from "axios";
 import { data, useLocation } from "react-router-dom";
 import { dataApiUrl, testIP } from './config';
+import { useUser } from './UserContext';
 function ClientFacetsPage() {
     const [excelData, setExcelData] = useState([]);
     const [directorStats, setDirectorStats] = useState({});
@@ -81,18 +82,85 @@ const [isPgYesLoading, setIsPgYesLoading] = useState(false);
 const [selectedPgYesGsp, setSelectedPgYesGsp] = useState('All');
 const [selectedPreSerGsp, setSelectedPreSerGsp] = useState('All');
 
+    // Get account from UserContext
+    const { account } = useUser();
+
+    // Helper function to get available GSP options based on user account
+    const getAvailableGspOptions = useCallback(() => {
+      if (!account) return ['All', 'Onshore', 'Sagility', 'Concentrix', 'Wipro']; // Default if no account
+      
+      switch (account.toLowerCase()) {
+        case 'concentrix':
+          return ['Concentrix']; // Concentrix users only see Concentrix
+        case 'wipro':
+          return ['Wipro']; // Wipro users only see Wipro
+        case 'sagility':
+          return ['Sagility']; // Sagility users only see Sagility
+        case 'onshore':
+          return ['All', 'Onshore', 'Sagility', 'Concentrix', 'Wipro']; // Onshore users see all options
+        default:
+          return ['All', 'Onshore', 'Sagility', 'Concentrix', 'Wipro']; // Default all options
+      }
+    }, [account]);
+
+    // Helper function to determine if GSP dropdown should be disabled
+    const isGspDropdownDisabled = useCallback(() => {
+      // GSP dropdown is disabled for Concentrix, Wipro, and Sagility (they can only see their own GSP)
+      return account && ['concentrix', 'wipro', 'sagility'].includes(account.toLowerCase());
+    }, [account]);
+
+    // Set default GSP based on user account
     useEffect(() => {
-      // Initial data load on component mount
-      fetchFacetsSummary();
-      fetchFacetsStatusGraph();
-      fetchFacetsPendReasonCt();
-      fetchMbrPrv();
-      fetchComplianceRawData();
-      fetchCaseStatusPerTeamLeader();
-      fetchPgNameSummary();
-      fetchNonAsoSummary();
-      fetchPreserviceRows(selectedPreSerGsp, preservicePage, preservicePageSize);
-    }, []);
+      if (account) {
+        const accountLower = account.toLowerCase();
+        
+        if (accountLower === 'concentrix') {
+          setSelectedGsp('Concentrix');
+          setSelectedPendedGsp('Concentrix');
+          setSelectedIfpGsp('Concentrix');
+          setSelectedPgSummaryGsp('Concentrix');
+          setSelectedPgYesGsp('Concentrix');
+          setSelectedPreSerGsp('Concentrix');
+        } else if (accountLower === 'wipro') {
+          setSelectedGsp('Wipro');
+          setSelectedPendedGsp('Wipro');
+          setSelectedIfpGsp('Wipro');
+          setSelectedPgSummaryGsp('Wipro');
+          setSelectedPgYesGsp('Wipro');
+          setSelectedPreSerGsp('Wipro');
+        } else if (accountLower === 'sagility') {
+          setSelectedGsp('Sagility');
+          setSelectedPendedGsp('Sagility');
+          setSelectedIfpGsp('Sagility');
+          setSelectedPgSummaryGsp('Sagility');
+          setSelectedPgYesGsp('Sagility');
+          setSelectedPreSerGsp('Sagility');
+        } else if (accountLower === 'onshore') {
+          // Onshore users get 'All' by default
+          setSelectedGsp('All');
+          setSelectedPendedGsp('All');
+          setSelectedIfpGsp('All');
+          setSelectedPgSummaryGsp('All');
+          setSelectedPgYesGsp('All');
+          setSelectedPreSerGsp('All');
+        }
+      }
+    }, [account]);
+
+    useEffect(() => {
+      // Initial data load on component mount - only if account is available
+      if (account) {
+        fetchFacetsSummary();
+        fetchFacetsStatusGraph();
+        fetchFacetsPendReasonCt();
+        fetchMbrPrv();
+        fetchComplianceRawData();
+        fetchCaseStatusPerTeamLeader();
+        fetchPgNameSummary();
+        fetchNonAsoSummary();
+        fetchPreserviceRows(selectedPreSerGsp, preservicePage, preservicePageSize);
+      }
+    }, [account]);
 
     const fetchNonCompliant = async () => {
       try {
@@ -211,10 +279,12 @@ const fetchPgYesRows = async (gsp, page, size) => {
 
 
 function fetchComplianceRawData(){
-  // Fetch only once
+  // Filter by account - only send account parameter if not 'Onshore'
+  const accountParam = (account && account.toLowerCase() !== 'onshore') ? account : '';
+  
   console.log('🟢 FACETS: fetchComplianceRawData - claim_system:', claimSystem);
   axios.post(`${dataApiUrl}get_dashboard_out_of_compliance_ct`, {
-    account: 'Onshore',
+    account: accountParam || 'Onshore',
     claim_system: claimSystem
   }).then(res => setComplianceRawData(res.data))
     .catch(err => console.error("🔴 FACETS Error fetching compliance data:", err));
@@ -224,14 +294,22 @@ function fetchComplianceRawData(){
 // Fetch case status per team leader
 async function fetchCaseStatusPerTeamLeader() {
   try {
-    const res = await axios.get(`${dataApiUrl}get_cases_status_ct_teamlead_per_agent`);
+    // Filter by account - only send account parameter if not 'Onshore'
+    const accountParam = (account && account.toLowerCase() !== 'onshore') ? account : '';
+    
+    const res = await axios.post(`${dataApiUrl}get_cases_status_ct_manager`, {
+      account: accountParam,
+      claim_system: ''
+    });
+    console.log('🟢 FACETS: fetchCaseStatusPerTeamLeader - claim_system:', claimSystem, 'account:', accountParam);
+    
     if (res.data) {
       setFacetsCaseStatusPerTeamLeader(res.data);
     } else {
       setFacetsCaseStatusPerTeamLeader([]);
     }
   } catch (error) {
-    console.error('Failed to fetch case status per team leader:', error);
+    console.error('🔴 FACETS Failed to fetch case status per team leader:', error);
     setFacetsCaseStatusPerTeamLeader([]);
   }
 }
@@ -283,12 +361,18 @@ const trendChartData = useMemo(() => {
   const grouped = {};
   summaryData.forEach(row => {
     const date = row.upload_Date?.split('T')[0];
-    const account = row.account?.trim();
-    if (!date || !account || account === 'Total') return;
+    const rowAccount = row.account?.trim();
+    if (!date || !rowAccount || rowAccount === 'Total') return;
+    
+    // Filter by user account if not Onshore
+    if (account && account.toLowerCase() !== 'onshore') {
+      if (rowAccount.toLowerCase() !== account.toLowerCase()) return;
+    }
+    
     if (!grouped[date]) grouped[date] = [];
     grouped[date].push({
       date,
-      account,
+      account: rowAccount,
       Assigned: row.assigned_Count || 0,
       Open: row.open_Count || 0,
       Pended: row.pended_Count || 0,
@@ -298,7 +382,7 @@ const trendChartData = useMemo(() => {
   });
   // Flatten and filter out any accidental "Total" bars
   return Object.values(grouped).flat().filter(d => d.account !== 'Total' && d.date !== 'Total');
-}, [summaryData]);
+}, [summaryData, account]);
 
 
 
@@ -390,8 +474,12 @@ useEffect(() => {
 
     const fetchFacetsStatusGraph = async () => {
         try {
+          // Filter by account - only send account parameter if not 'Onshore'
+          const accountParam = (account && account.toLowerCase() !== 'onshore') ? account : '';
+          
           const res = await axios.post(`${dataApiUrl}get_dashboard_status_ct`, {
-            claim_system: claimSystem
+            claim_system: claimSystem,
+            account: accountParam
           });
           console.log('🟢 FACETS: fetchFacetsStatusGraph - claim_system:', claimSystem);
           const filtered = res.data.filter(x => x.Account !== 'Total');
@@ -462,9 +550,12 @@ const filteredPgNames = useMemo(() => {
     const fetchFacetsSummary = async () => {
       try {
         console.log('🟢 FACETS: Fetching summary with claim_system:', claimSystem);
+        // Filter by account - only send account parameter if not 'Onshore'
+        const accountParam = (account && account.toLowerCase() !== 'onshore') ? account : '';
+        
         const response = await axios.post(`${dataApiUrl}get_dashboard_summary`, {
           claim_system: claimSystem,
-          account: ''
+          account: accountParam
         });
         const data = response.data;
         console.log('🟢 FACETS API Response - get_dashboard_summary:', data);
@@ -544,10 +635,14 @@ const filteredPgNames = useMemo(() => {
 
     const fetchMbrPrv = async () => {
       try {
-        const selectedPendedGsp = selectedGsp === "All" ? "" : selectedGsp;
+        // Use selectedGsp, but if account is set and not 'Onshore', filter by account
+        let accountFilter = selectedGsp === "All" ? "" : selectedGsp;
+        if (account && account.toLowerCase() !== 'onshore' && selectedGsp === 'All') {
+          accountFilter = account;
+        }
       
         const response = await axios.post(`${dataApiUrl}get_dashboard_mbr_prov_ct`, {
-          account: selectedPendedGsp,
+          account: accountFilter,
           claim_system: claimSystem
         });
       
@@ -1600,13 +1695,25 @@ const sortIcon = (col) => {
         Total Facets Appeals as of {new Date().toLocaleDateString()}
       </div>
       <div style={{ fontSize: '14px', fontWeight: '500', color: '#003b70' }}>
-      Total Appeals:&nbsp;
-      {(latestFacetsCounts.Sagility || 0) + (latestFacetsCounts.Concentrix || 0) + (latestFacetsCounts.Wipro || 0) + (latestFacetsCounts.Onshore || 0)}
-      &nbsp;|&nbsp; Sagility: {latestFacetsCounts.Sagility}
-      &nbsp;|&nbsp; Concentrix: {latestFacetsCounts.Concentrix}
-      &nbsp;|&nbsp; Wipro: {latestFacetsCounts.Wipro}
-      &nbsp;|&nbsp; Onshore: {latestFacetsCounts.Onshore}
-   
+      {(() => {
+        if (account && account.toLowerCase() !== 'onshore') {
+          // Show only the user's account
+          const count = latestFacetsCounts[account] || 0;
+          return `Total Appeals: ${count} | ${account}: ${count}`;
+        } else {
+          // Show all accounts for Onshore users
+          return (
+            <>
+              Total Appeals:&nbsp;
+              {(latestFacetsCounts.Sagility || 0) + (latestFacetsCounts.Concentrix || 0) + (latestFacetsCounts.Wipro || 0) + (latestFacetsCounts.Onshore || 0)}
+              &nbsp;|&nbsp; Sagility: {latestFacetsCounts.Sagility}
+              &nbsp;|&nbsp; Concentrix: {latestFacetsCounts.Concentrix}
+              &nbsp;|&nbsp; Wipro: {latestFacetsCounts.Wipro}
+              &nbsp;|&nbsp; Onshore: {latestFacetsCounts.Onshore}
+            </>
+          );
+        }
+      })()}
       </div>
     </div>
 
@@ -1748,6 +1855,7 @@ const sortIcon = (col) => {
   <select
     value={selectedPendedGsp}
     onChange={e => setSelectedPendedGsp(e.target.value)}
+    disabled={isGspDropdownDisabled()}
     style={{
       padding: '8px 12px',
       borderRadius: '6px',
@@ -1755,11 +1863,12 @@ const sortIcon = (col) => {
       fontSize: '14px',
       width: '180px',
       fontFamily: 'inherit',
-      color: '#003b70',
-      backgroundColor: '#fff'
+      color: isGspDropdownDisabled() ? '#999' : '#003b70',
+      backgroundColor: isGspDropdownDisabled() ? '#f5f5f5' : '#fff',
+      cursor: isGspDropdownDisabled() ? 'not-allowed' : 'pointer'
     }}
   >
-    {['All', 'Sagility', 'Concentrix', 'Wipro'].map(g => (
+    {getAvailableGspOptions().map(g => (
       <option key={g} value={g}>{g}</option>
     ))}
   </select>
@@ -2029,8 +2138,8 @@ const sortIcon = (col) => {
           <tbody>
             {facetsCaseStatusPerTeamLeader.map((tl, idx) => (
               <tr key={`caseStatusTL_${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fbff' }}>
-                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.ownerID}</td>
-                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.ownerName}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.teamLead_Id}</td>
+                <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'left' }}>{tl.teamLead}</td>
                 <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.pended || 0}</td>
                 <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.completed || 0}</td>
                 <td style={{ padding: '10px 8px', border: '1px solid #eee', textAlign: 'center' }}>{tl.fFup_Sent || 0}</td>
@@ -2268,6 +2377,7 @@ const sortIcon = (col) => {
       <select
         value={selectedIfpGsp}
         onChange={(e) => setSelectedIfpGsp(e.target.value)}
+        disabled={isGspDropdownDisabled()}
         style={{
           padding: '8px 12px',
           borderRadius: '6px',
@@ -2275,11 +2385,12 @@ const sortIcon = (col) => {
           fontSize: '14px',
           width: '150px',
           fontFamily: 'inherit',
-          color: '#003b70',
-          backgroundColor: '#fff',
+          color: isGspDropdownDisabled() ? '#999' : '#003b70',
+          backgroundColor: isGspDropdownDisabled() ? '#f5f5f5' : '#fff',
+          cursor: isGspDropdownDisabled() ? 'not-allowed' : 'pointer'
         }}
       >
-        {['All', 'Sagility', 'Concentrix', 'Wipro', 'Onshore'].map((gsp) => (
+        {getAvailableGspOptions().map((gsp) => (
           <option key={gsp} value={gsp}>{gsp}</option>
         ))}
       </select>
@@ -2443,6 +2554,7 @@ const sortIcon = (col) => {
       <select
         value={selectedPgSummaryGsp}
         onChange={e => setSelectedPgSummaryGsp(e.target.value)}
+        disabled={isGspDropdownDisabled()}
         style={{
           padding: '8px 12px',
           borderRadius: '6px',
@@ -2450,12 +2562,13 @@ const sortIcon = (col) => {
           fontSize: '14px',
           width: '150px',
           fontFamily: 'inherit',
-          color: '#003b70',
-          backgroundColor: '#fff',
+          color: isGspDropdownDisabled() ? '#999' : '#003b70',
+          backgroundColor: isGspDropdownDisabled() ? '#f5f5f5' : '#fff',
+          cursor: isGspDropdownDisabled() ? 'not-allowed' : 'pointer'
         }}
       >
      <option value="All">All</option>
-      {pgNameAccounts.map(gsp => (
+      {pgNameAccounts.filter(gsp => account.toLowerCase() === 'onshore' || gsp === account).map(gsp => (
         <option key={gsp} value={gsp}>{gsp}</option>
       ))}
       </select>
@@ -2560,6 +2673,7 @@ const sortIcon = (col) => {
       <select
         value={selectedDirector}
         onChange={(e) => setSelectedDirector(e.target.value)}
+        disabled={isGspDropdownDisabled()}
         style={{
           padding: '8px 12px',
           borderRadius: '6px',
@@ -2567,11 +2681,12 @@ const sortIcon = (col) => {
           fontSize: '14px',
           width: '150px',
           fontFamily: 'inherit',
-          color: '#003b70',
-          backgroundColor: '#fff',
+          color: isGspDropdownDisabled() ? '#999' : '#003b70',
+          backgroundColor: isGspDropdownDisabled() ? '#f5f5f5' : '#fff',
+          cursor: isGspDropdownDisabled() ? 'not-allowed' : 'pointer'
         }}
       >
-          {['All', 'Onshore','Sagility', 'Concentrix']
+          {getAvailableGspOptions()
           .map((dir, index) => (
             <option key={index} value={dir}>
               {dir}
@@ -2723,6 +2838,7 @@ const sortIcon = (col) => {
   <select
     value={selectedPreSerGsp}
     onChange={(e) => setSelectedPreSerGsp(e.target.value)}
+    disabled={isGspDropdownDisabled()}
     style={{
       padding: '8px 12px',
       borderRadius: '6px',
@@ -2730,11 +2846,12 @@ const sortIcon = (col) => {
       fontSize: '14px',
       width: '150px',
       fontFamily: 'inherit',
-      color: '#003b70',
-      backgroundColor: '#fff',
+      color: isGspDropdownDisabled() ? '#999' : '#003b70',
+      backgroundColor: isGspDropdownDisabled() ? '#f5f5f5' : '#fff',
+      cursor: isGspDropdownDisabled() ? 'not-allowed' : 'pointer'
     }}
   >
-    {['All',  'Onshore', 'Sagility', 'Concentrix'].map((gsp) => (
+    {getAvailableGspOptions().map((gsp) => (
       <option key={gsp} value={gsp}>
         {gsp}
       </option>
@@ -2899,6 +3016,7 @@ const sortIcon = (col) => {
           setSelectedPgYesGsp(e.target.value);
           setPgYesPage(1); // Reset to first page on filter change
         }}
+        disabled={isGspDropdownDisabled()}
         style={{
           padding: '8px 12px',
           borderRadius: '6px',
@@ -2906,11 +3024,12 @@ const sortIcon = (col) => {
           fontSize: '14px',
           width: '150px',
           fontFamily: 'inherit',
-          color: '#003b70',
-          backgroundColor: '#fff',
+          color: isGspDropdownDisabled() ? '#999' : '#003b70',
+          backgroundColor: isGspDropdownDisabled() ? '#f5f5f5' : '#fff',
+          cursor: isGspDropdownDisabled() ? 'not-allowed' : 'pointer'
         }}
       >
-        {['All', 'Onshore','Sagility', 'Concentrix'].map((gsp) => (
+        {getAvailableGspOptions().map((gsp) => (
           <option key={gsp} value={gsp}>
             {gsp}
           </option>

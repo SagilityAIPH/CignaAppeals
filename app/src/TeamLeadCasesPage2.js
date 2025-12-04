@@ -1754,7 +1754,7 @@ const fetchCaseDetailsById = async (id) => {
       )}
 
       {/* Pre-Service Section */}
-      {preserviceRows.length > 0 && (
+      {caseStatusPerAgent.length > 0 && (
         <div
           style={{
             marginTop: "20px",
