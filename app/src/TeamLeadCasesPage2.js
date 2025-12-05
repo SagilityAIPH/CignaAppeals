@@ -1776,7 +1776,7 @@ const fetchCaseDetailsById = async (id) => {
         >
           <div style={{ display: "flex", borderBottom: "2px solid #ddd", marginBottom: "16px" }}>
             <button
-              onClick={() => setActiveAppealCasesTab("appealCases")}
+              onClick={() => { setActiveAppealCasesTab("appealCases"); setCaseStatusFilter("All"); }}  // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -1793,7 +1793,7 @@ const fetchCaseDetailsById = async (id) => {
               {/* Overall - {totalAppealCases} */}
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("assignedByCC")}
+              onClick={() => { setActiveAppealCasesTab("assignedByCC"); setCaseStatusFilter("All"); }} // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -1809,7 +1809,8 @@ const fetchCaseDetailsById = async (id) => {
               Assigned by CC
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("pended")}
+              // set filter to Pended on tab change since T-Minus column depends on it
+              onClick={() => { setActiveAppealCasesTab("pended"); setCaseStatusFilter("Pended"); }}
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -1825,7 +1826,7 @@ const fetchCaseDetailsById = async (id) => {
               Pended
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("completed")}
+              onClick={() => { setActiveAppealCasesTab("completed"); setCaseStatusFilter("All"); }} // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -1841,7 +1842,7 @@ const fetchCaseDetailsById = async (id) => {
               Completed
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("followedUp")}
+              onClick={() => { setActiveAppealCasesTab("followedUp"); setCaseStatusFilter("All"); }} // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -1868,14 +1869,25 @@ const fetchCaseDetailsById = async (id) => {
           Filter by Case Status:
         </label>
         <select
-          value={caseStatusFilter}
+          value={
+            activeAppealCasesTab === "pended"
+              ? "Pended"
+              : activeAppealCasesTab === "completed"
+              ? "Completed"
+              : activeAppealCasesTab === "followedUp"
+              ? "FFup Sent"
+              : caseStatusFilter
+          }
           onChange={(e) => setCaseStatusFilter(e.target.value)}
+          disabled={activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp"}
           style={{
             padding: 8,
             borderRadius: 6,
             border: "1px solid #ccc",
             width: "100%",
             fontFamily: "inherit",
+            backgroundColor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "#f0f0f0" : "white",
+            cursor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "not-allowed" : "pointer"
           }}
         >
           <option value="">All</option>
@@ -2259,8 +2271,9 @@ const fetchCaseDetailsById = async (id) => {
               padding: '8px',
               border: '1px solid #eee',
               color:
-                (excelKey === 't_Minus' &&
-                  (row[excelKey] === '04:00' || (!row[excelKey] && row.appealStatus === 'Open'))) ||
+                (excelKey === 'appealStatus' && row.appealStatus.includes("Completed"))
+                  ? "green"
+                  : (excelKey === 't_Minus' && (row[excelKey] === '04:00' || (!row[excelKey] && row.appealStatus === 'Open'))) ||
                 ((excelKey === 'appealStatus' || excelKey === 't_Minus') &&
                   row.appealStatus === 'Pended')
                   ? 'red'

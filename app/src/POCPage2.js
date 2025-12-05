@@ -2079,7 +2079,7 @@ const caseStatusUpdate = async (status) => {
   >
     <div style={{ display: "flex", borderBottom: "2px solid #ddd", marginBottom: "16px" }}>
             <button
-              onClick={() => setActiveAppealCasesTab("appealCases")}
+              onClick={() => { setActiveAppealCasesTab("appealCases"); setCaseStatusFilter("All"); }}  // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -2096,7 +2096,7 @@ const caseStatusUpdate = async (status) => {
               {/* Overall - {totalAppealCases} */}
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("assignedByCC")}
+              onClick={() => { setActiveAppealCasesTab("assignedByCC"); setCaseStatusFilter("All"); }} // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -2112,7 +2112,8 @@ const caseStatusUpdate = async (status) => {
               Assigned by CC
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("pended")}
+              // set filter to Pended on tab change since T-Minus column depends on it
+              onClick={() => { setActiveAppealCasesTab("pended"); setCaseStatusFilter("Pended"); }}
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -2128,7 +2129,7 @@ const caseStatusUpdate = async (status) => {
               Pended
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("completed")}
+              onClick={() => { setActiveAppealCasesTab("completed"); setCaseStatusFilter("All"); }} // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -2144,7 +2145,7 @@ const caseStatusUpdate = async (status) => {
               Completed
             </button>
             <button
-              onClick={() => setActiveAppealCasesTab("followedUp")}
+              onClick={() => { setActiveAppealCasesTab("followedUp"); setCaseStatusFilter("All"); }} // Reset filter on tab change
               style={{
                 padding: "12px 24px",
                 fontSize: "15px",
@@ -2173,14 +2174,25 @@ const caseStatusUpdate = async (status) => {
           Filter by Case Status:
         </label>
         <select
-          value={caseStatusFilter}
+          value={
+            activeAppealCasesTab === "pended"
+              ? "Pended"
+              : activeAppealCasesTab === "completed"
+              ? "Completed"
+              : activeAppealCasesTab === "followedUp"
+              ? "FFup Sent"
+              : caseStatusFilter
+          }
           onChange={(e) => setCaseStatusFilter(e.target.value)}
+          disabled={activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp"}
           style={{
             padding: 8,
             borderRadius: 6,
             border: "1px solid #ccc",
             width: "100%",
             fontFamily: "inherit",
+            backgroundColor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "#f0f0f0" : "white",
+            cursor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "not-allowed" : "pointer"
           }}
         >
           <option value="">All</option>
@@ -2551,7 +2563,9 @@ const caseStatusUpdate = async (status) => {
                   padding: '8px',
                   border: '1px solid #eee',
                   color:
-                    (excelKey === 'appealStatus' || excelKey === 't_Minus') &&
+                    (excelKey === 'appealStatus' && row.appealStatus.includes("Completed"))
+                      ? "green"
+                      : (excelKey === 't_Minus' || excelKey === 't_Minus') &&
                     row.appealStatus === 'Pended'
                       ? 'red'
                       : 'inherit',
