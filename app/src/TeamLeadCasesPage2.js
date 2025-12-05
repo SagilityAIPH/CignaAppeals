@@ -845,7 +845,8 @@ const handleSendFollowUpEmails = async () => {
 
   const preserviceColumnMap = {
     "Age Cal": "AGE",
-    SR: "SR.", // ← ✅ FIXED: 'SR .' changed to 'SR'
+    SR: "SR.",
+    pend_reason: "Pending Reason",
     Manager: "Manager",
     AGE_PROMISE_BUCKET: "PROMISE",
     "Promise Date": "Task Promise Date",
@@ -863,6 +864,7 @@ const handleSendFollowUpEmails = async () => {
 let caseTblAllColumnMap = {
   sr: "SR",
   ff: "FFUp (Days)",
+  pend_reason: "Pending Reason",
   age_Cal: "Age (Days)",
   manager: "Manager",
   agE_PROMISE: "Promise",

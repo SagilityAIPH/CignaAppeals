@@ -391,6 +391,7 @@ let caseTblAllColumnMap = {
   id: "Id",
   age_Cal: "Age (Days)",
   sr: "SR",
+  pend_reason: "Pending Reason",
   ff: "FFUp (Days)",
   manager: "Manager",
   agE_PROMISE: "Promise",

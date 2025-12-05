@@ -248,6 +248,7 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
 let caseTblAllColumnMap = {
   
   sr: "SR",
+  pend_reason: "Pending Reason",
    ff: 'FFup (Days)',
   age_Cal: "Age (Days)",
   manager: "Manager",
