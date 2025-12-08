@@ -113,6 +113,7 @@ function POCPage() {
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
   const [managerFilter, setManagerFilter] = useState("All");
   const [managerList, setManagerList] = useState([]);
+  const [selectedManagers, setSelectedManagers] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedRow, setSelectedRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -248,8 +249,9 @@ const isAllSelected = caseTblAllPoc.length > 0 && selectedRows.length === caseTb
 let caseTblAllColumnMap = {
   
   sr: "SR",
+  ff: 'FFup (Days)',
+  ff_date: "FFup Date",
   pend_reason: "Pending Reason",
-   ff: 'FFup (Days)',
   age_Cal: "Age (Days)",
   manager: "Manager",
   agE_PROMISE: "Promise",
@@ -649,7 +651,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       assignedStatus: assignmentFilter === 'All' ? '' : assignmentFilter,
       claim_system: claimSystemParam,
       account: accountParam,
-      manager: managerFilter === 'All' ? '' : managerFilter,
+      manager: selectedManagers.length > 0 ? selectedManagers : (managerFilter === 'All' ? [] : [managerFilter]),
       ...prioritizationPayload
     };
     
@@ -689,7 +691,7 @@ useEffect(() => {
   } else {
 
   }
-}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, managerFilter, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
+}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, managerFilter, selectedManagers, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
 
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
@@ -888,6 +890,7 @@ const handleRefresh = async () => {
     setCaseStatusFilter("All");
     setPrioritizationFilter("");
     setManagerFilter("All");
+    setSelectedManagers([]);
     setCurrentPage(1);
     setPageSize(10);
     setSelectedRows([]);
@@ -951,7 +954,9 @@ const handleExtractExcel = async () => {
     const response = await axios.get(`${exportAPI}export_appeals`, {
        responseType: 'blob',
       params: {
-      account: selectedGsp === "All" ?  "" : selectedGsp// <-- your variable here
+      account: selectedGsp === "All" ?  "" : selectedGsp,// <-- your variable here
+      dateFrom: fromDate || null,
+      dateTo: toDate || null
   }
 });
 
@@ -1932,18 +1937,6 @@ const caseStatusUpdate = async (status) => {
                           fontSize: "14px",
                         }}
                       >
-                        <h4
-                          style={{
-                            marginTop: "0px",
-                            marginBottom: "16px",
-                            color: "#003b70",
-                            fontWeight: "600",
-                            textAlign: "left",
-                          }}
-                        >
-                          Case Summary
-                        </h4>
-
                         {caseStatusCt && (() => {
                           const {
                             total_Count: total,
@@ -1981,7 +1974,9 @@ const caseStatusUpdate = async (status) => {
 
                             total_NonCompliant_Yes,
                             total_PreService,
-                            total_PG_Yes
+                            total_PG_Yes,
+                            pG_NonCompliant_Ct,
+                            preService_NonCompliant_Ct
                           } = caseStatusCt;
 
                           const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -1992,6 +1987,7 @@ const caseStatusUpdate = async (status) => {
                               <div style={{ display: "flex", flexWrap: "wrap", columnGap: "5%", rowGap: "12px" }}>
                                 {/* Left column */}
                                 <div style={{ flex: "1 1 45%" }}>
+                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>Case Summary</div>
                                   <div>📁 Total Cases: <strong>{total}</strong></div>
                                   <div>🚀 Assigned: <strong>{assigned}</strong></div>
                                    <div>🆕 New Assigned: <strong>{newAssigned}</strong></div>
@@ -2001,6 +1997,7 @@ const caseStatusUpdate = async (status) => {
                                   {/* <div>📂 Pend: <strong>{open}</strong></div> */}
                                   <div>✅ Completed: <strong>{completed}</strong></div>
                                     <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
+                                  <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
                             
                                 </div>
 
@@ -2029,6 +2026,7 @@ const caseStatusUpdate = async (status) => {
                                   <div>🟡 Pended: <strong>{pended_PreService}</strong></div>
                                   <div>✅ Completed: <strong>{completed_PreService}</strong></div>
                                  <div>🔔 FFup Sent: <strong>{fFup_Sent_PreService}</strong></div>
+                                 <div>📊 Total Pre-Service Non-Compliant: <strong>{preService_NonCompliant_Ct}</strong></div>
                                 </div>
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
@@ -2041,6 +2039,7 @@ const caseStatusUpdate = async (status) => {
                                   <div>🟡 Pended: <strong>{pended_PG}</strong></div>
                                   <div>✅ Completed: <strong>{completed_PG}</strong></div>
                                   <div>🔔 FFup Sent: <strong>{fFup_Sent_PG}</strong></div>
+                                  <div>📊 Total PG Non-Compliant: <strong>{pG_NonCompliant_Ct}</strong></div>
                                 </div>
                               </div>
 
@@ -2181,18 +2180,20 @@ const caseStatusUpdate = async (status) => {
               ? "Completed"
               : activeAppealCasesTab === "followedUp"
               ? "FFup Sent"
+              : activeAppealCasesTab === "assignedByCC"
+              ? "New Assigned"
               : caseStatusFilter
           }
           onChange={(e) => setCaseStatusFilter(e.target.value)}
-          disabled={activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp"}
+          disabled={activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" || activeAppealCasesTab === "assignedByCC"}
           style={{
             padding: 8,
             borderRadius: 6,
             border: "1px solid #ccc",
             width: "100%",
             fontFamily: "inherit",
-            backgroundColor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "#f0f0f0" : "white",
-            cursor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "not-allowed" : "pointer"
+            backgroundColor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" || activeAppealCasesTab === "assignedByCC" ? "#f0f0f0" : "white",
+            cursor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" || activeAppealCasesTab === "assignedByCC" ? "not-allowed" : "pointer"
           }}
         >
           <option value="">All</option>
@@ -2243,7 +2244,7 @@ const caseStatusUpdate = async (status) => {
             fontFamily: "inherit",
           }}
         >
-          <option value="">-Select Prioritization-</option>
+          <option value="">-- Select Prioritization --</option>
           <option value="NonCompliant2_Yes">OOC (NonCompliant - YES)</option>
           <option value="PreService">Pre-Service</option>
           <option value="PG_Yes">PG - YES</option>
@@ -2261,28 +2262,97 @@ const caseStatusUpdate = async (status) => {
         <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4 }}>
           Filter by Manager:
         </label>
-        <select
-          value={managerFilter}
-          onChange={(e) => setManagerFilter(e.target.value)}
-          style={{
-            padding: 8,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-            width: "100%",
-            fontFamily: "inherit",
-          }}
-        >
-          <option value="All">All Managers</option>
-          {managerList && managerList.length > 0 ? (
-            managerList.map((manager, index) => (
-              <option key={index} value={manager}>
-                {manager}
-              </option>
-            ))
-          ) : (
-            <option disabled>No managers available</option>
+        <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+          <select
+            value=""
+            onChange={(e) => {
+              const manager = e.target.value;
+              if (manager && !selectedManagers.includes(manager)) {
+                setSelectedManagers([...selectedManagers, manager]);
+              }
+            }}
+            style={{
+              padding: 8,
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              flex: 1,
+              fontFamily: "inherit",
+            }}
+          >
+            <option value="">-- Select Manager --</option>
+            {managerList && managerList.length > 0 ? (
+              managerList.map((manager, index) => (
+                <option 
+                  key={index} 
+                  value={manager}
+                  disabled={selectedManagers.includes(manager)}
+                >
+                  {manager}
+                </option>
+              ))
+            ) : (
+              <option disabled>No managers available</option>
+            )}
+          </select>
+          {selectedManagers.length > 0 && (
+            <button
+              onClick={() => setSelectedManagers([])}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 6,
+                border: "none",
+                backgroundColor: "#ff4d4f",
+                color: "white",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                whiteSpace: "nowrap"
+              }}
+            >
+              Clear
+            </button>
           )}
-        </select>
+        </div>
+        {selectedManagers.length > 0 && (
+          <div style={{
+            marginTop: 8,
+            padding: 8,
+            backgroundColor: "#f5f5f5",
+            borderRadius: 4,
+            border: "1px solid #ddd",
+            fontSize: 12,
+            maxHeight: 100,
+            overflowY: "auto"
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 6, color: "#003b70" }}>
+              Selected Manager(s):
+            </div>
+            {selectedManagers.map((manager, idx) => (
+              <div key={idx} style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                padding: "4px 0",
+                borderBottom: idx < selectedManagers.length - 1 ? "1px solid #e0e0e0" : "none"
+              }}>
+                <span>{manager}</span>
+                <button
+                  onClick={() => setSelectedManagers(selectedManagers.filter((_, i) => i !== idx))}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#ff4d4f",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    fontWeight: "bold"
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
               {/*Filter rows*/}
@@ -2343,11 +2413,11 @@ const caseStatusUpdate = async (status) => {
         display: "block",
         marginBottom: "8px"
       }}>
-        Search by SR Number, Manager, or Owner ID:
+        Search by SR Number or Owner ID:
       </label>
       <input
         type="text"
-        placeholder="Enter SR number, Manager Name, or Owner ID to filter table..."
+        placeholder="Enter SR number or Owner ID to filter table..."
         value={tableDataSearchTerm}
         onChange={(e) => setTableDataSearchTerm(e.target.value)}
         style={{
@@ -2369,9 +2439,8 @@ const caseStatusUpdate = async (status) => {
           Found {caseTblAllPoc.filter(row => {
             const term = tableDataSearchTerm.toUpperCase();
             const srMatch = String(row["sr"] || row["SR"] || row["SR."] || "").toUpperCase().includes(term);
-            const managerMatch = String(row["manager"] || row["Manager"] || "").toUpperCase().includes(term);
             const ownerIDMatch = String(row["ownerID"] || row["OwnerID"] || "").toUpperCase().includes(term);
-            return srMatch || managerMatch || ownerIDMatch;
+            return srMatch || ownerIDMatch;
           }).length} matching records
         </div>
       )}

@@ -864,6 +864,7 @@ const handleSendFollowUpEmails = async () => {
 let caseTblAllColumnMap = {
   sr: "SR",
   ff: "FFUp (Days)",
+  date: "Date",
   pend_reason: "Pending Reason",
   age_Cal: "Age (Days)",
   manager: "Manager",
@@ -1876,18 +1877,20 @@ const fetchCaseDetailsById = async (id) => {
               ? "Completed"
               : activeAppealCasesTab === "followedUp"
               ? "FFup Sent"
+              : activeAppealCasesTab === "assignedByCC"
+              ? "New Assigned"
               : caseStatusFilter
           }
           onChange={(e) => setCaseStatusFilter(e.target.value)}
-          disabled={activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp"}
+          disabled={activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" || activeAppealCasesTab === "assignedByCC"}
           style={{
             padding: 8,
             borderRadius: 6,
             border: "1px solid #ccc",
             width: "100%",
             fontFamily: "inherit",
-            backgroundColor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "#f0f0f0" : "white",
-            cursor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" ? "not-allowed" : "pointer"
+            backgroundColor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" || activeAppealCasesTab === "assignedByCC" ? "#f0f0f0" : "white",
+            cursor: activeAppealCasesTab === "pended" || activeAppealCasesTab === "completed" || activeAppealCasesTab === "followedUp" || activeAppealCasesTab === "assignedByCC" ? "not-allowed" : "pointer"
           }}
         >
           <option value="">All</option>
@@ -1997,11 +2000,11 @@ const fetchCaseDetailsById = async (id) => {
               display: "block",
               marginBottom: "8px"
             }}>
-              Search by SR Number, Manager, or Owner ID:
+              Search by SR Number or Owner ID:
             </label>
             <input
               type="text"
-              placeholder="Enter SR number, Manager Name, or Owner ID to filter table..."
+              placeholder="Enter SR number or Owner ID to filter table..."
               value={tableDataSearchTerm}
               onChange={(e) => setTableDataSearchTerm(e.target.value)}
               style={{
@@ -2023,9 +2026,8 @@ const fetchCaseDetailsById = async (id) => {
                 Found {caseTblAll.filter(row => {
                   const term = tableDataSearchTerm.toUpperCase();
                   const srMatch = String(row["sr"] || row["SR"] || row["SR."] || "").toUpperCase().includes(term);
-                  const managerMatch = String(row["manager"] || row["Manager"] || "").toUpperCase().includes(term);
                   const ownerIDMatch = String(row["ownerID"] || row["OwnerID"] || "").toUpperCase().includes(term);
-                  return srMatch || managerMatch || ownerIDMatch;
+                  return srMatch || ownerIDMatch;
                 }).length} matching records
               </div>
             )}
