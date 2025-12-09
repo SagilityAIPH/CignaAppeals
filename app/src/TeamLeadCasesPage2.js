@@ -1978,37 +1978,6 @@ const fetchCaseDetailsById = async (id) => {
         </select>
       </div>
 
-
-            {/* Page Size Selector */}
-            <div style={{ width: "150px" }}>
-                <label
-                  style={{
-                    fontWeight: "500",
-                    color: "#003b70",
-                    display: "block",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Rows per page:
-                </label>
-                <select
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                  style={{
-                    padding: "8px",
-                    borderRadius: "6px",
-                    border: "1px solid #ccc",
-                    width: "100%",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-
           </div>
           
           {/* SR Number & Manager Search Input */}
@@ -2414,6 +2383,36 @@ const fetchCaseDetailsById = async (id) => {
               >
                 Next
               </button>
+
+              {/* Page Size Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label
+                  htmlFor="pageSize"
+                  style={{
+                    fontWeight: "500",
+                    color: "#003b70"
+                  }}
+                >
+                  Rows per page:
+                </label>
+                <select
+                  id="pageSize"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  style={{
+                    padding: "8px",
+                    borderRadius: "6px",
+                    border: "1px solid #ccc",
+                    width: "65px",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
             </div>
           </div>
           </>

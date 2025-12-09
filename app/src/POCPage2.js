@@ -2076,7 +2076,7 @@ const caseStatusUpdate = async (status) => {
       marginTop: 40,
       maxWidth: 1500,
       marginInline: "auto",
-      backgroundColor: "white",
+      backgroundColor: "rgb(245, 246, 250)",
       padding: 24,
       borderRadius: 12,
       boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
@@ -2379,47 +2379,6 @@ const caseStatusUpdate = async (status) => {
         )}
       </div>
 
-              {/*Filter rows*/}
-    <div style={{ display: 'flex', flexDirection: 'column', width: '150px' }}>
-    <label
-      htmlFor="pageSize"
-      style={{
-        fontWeight: '500',
-        color: '#003b70',
-        marginBottom: '4px'
-      }}
-    >
-      Rows per page:
-    </label>
-    <select
-      id="pageSize"
-      value={pageSize === 0 ? '' : pageSize}  // show '' if 0 means all
-      onChange={(e) => {
-        const val = e.target.value;
-        if (val === '') {
-          setPageSize(10);    // 0 means fetch all
-          setCurrentPage(1);
-        } else {
-          setPageSize(parseInt(val, 10));
-          setCurrentPage(1);
-        }
-      }}
-      style={{
-        padding: '8px',
-        borderRadius: '4px',
-        border: '1px solid #ccc',
-        fontFamily: 'inherit',
-        width: '100%'
-      }}
-    >
-      {[10, 20, 50, 100].map(size => (
-        <option key={size} value={size}>{size}</option>
-      ))}
-  </select>
-
-
-
-  </div>
     </div>
   
     {/* SR Number & Manager Search Input */}
@@ -2865,6 +2824,45 @@ const caseStatusUpdate = async (status) => {
     >
       Next
     </button>
+
+    {/*Filter rows*/}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <label
+      htmlFor="pageSize"
+      style={{
+        fontWeight: '500',
+        color: '#003b70'
+      }}
+    >
+      Rows per page:
+    </label>
+    <select
+      id="pageSize"
+      value={pageSize === 0 ? '' : pageSize}  // show '' if 0 means all
+      onChange={(e) => {
+        const val = e.target.value;
+        if (val === '') {
+          setPageSize(10);    // 0 means fetch all
+          setCurrentPage(1);
+        } else {
+          setPageSize(parseInt(val, 10));
+          setCurrentPage(1);
+        }
+      }}
+      style={{
+        padding: '8px',
+        borderRadius: '4px',
+        border: '1px solid #ccc',
+        fontFamily: 'inherit',
+        width: '65px'
+      }}
+    >
+      {[10, 20, 50, 100].map(size => (
+        <option key={size} value={size}>{size}</option>
+      ))}
+    </select>
+  </div>
+
   </div>
 </>
 )}
