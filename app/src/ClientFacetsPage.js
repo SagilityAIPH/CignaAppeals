@@ -635,10 +635,8 @@ const filteredPgNames = useMemo(() => {
         '0-14': item.ageBuckets._0_14 || 0,
         '15-29': item.ageBuckets._15_29 || 0,
         '30-44': item.ageBuckets._30_44 || 0,
-        '45-59': item.ageBuckets._45_59 || 0,
-        '60-89': item.ageBuckets._60_89 || 0,
-        '90-179': item.ageBuckets._90_179 || 0,
-        '180-364': item.ageBuckets._180_364 || 0,
+        '45-60': item.ageBuckets._45_60 || 0,
+        '60-364': item.ageBuckets._60_364 || 0,
         '365+': item.ageBuckets._365_plus || 0
       }));
     };
@@ -1451,15 +1449,11 @@ const getColorForBucket = (index) => {
 };
 
 const orderedBucketColors = [
-  { bucket: '0-3', color: '#00C49F' },
-  { bucket: '4-7', color: '#66BB6A' },
-  { bucket: '8-14', color: '#42A5F5' },
+  { bucket: '0-14', color: '#00C49F' },
   { bucket: '15-29', color: '#FFA726' },
   { bucket: '30-44', color: '#FB8C00' },
-  { bucket: '45-59', color: '#F4511E' },
-  { bucket: '60-89', color: '#EF5350' },
-  { bucket: '90-179', color: '#E53935' },
-  { bucket: '180-364', color: '#D32F2F' },
+  { bucket: '45-60', color: '#F4511E' },
+  { bucket: '60-364', color: '#D32F2F' },
   { bucket: '365+', color: '#B71C1C' }
 ];
 
