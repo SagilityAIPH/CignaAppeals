@@ -86,6 +86,7 @@ function TeamLeadCasesPage() {
   const [totalAppealCases, setTotalAppealCases] = useState(0); 
   const totalPages2 = pageSize === 0 ? 1 : Math.ceil(totalAppealCases / pageSize);
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
+  const [oocFilter, setOocFilter] = useState("All");
   const [tableDataSearchTerm, setTableDataSearchTerm] = useState("");
   const [activeAppealCasesTab, setActiveAppealCasesTab] = useState("appealCases");
 
@@ -217,10 +218,14 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       prioritization: ''
     };
 
+    // Handle OOC filter separately
+    if (oocFilter === 'Yes') {
+      prioritizationPayload.NonCompliant2 = 'YES';
+    } else if (oocFilter === 'No') {
+      prioritizationPayload.NonCompliant2 = 'NO';
+    }
+
     switch (prioritizationFilter) {
-      case 'NonCompliant2_Yes':
-        prioritizationPayload.NonCompliant2 = 'YES';
-        break;
       case 'PG_Yes':
         prioritizationPayload.PG = 'YES';
         break;
@@ -409,7 +414,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     fetchAgeBucketSummary()
     fetchCaseStatusCt()
     fetchCaseStatusPerAgent()
-  }, [caseStatusFilter, assignmentFilter, prioritizationFilter, activeAppealCasesTab]);
+  }, [caseStatusFilter, assignmentFilter, prioritizationFilter, oocFilter, activeAppealCasesTab]);
 
   useEffect(() => {
     setCurrentPage(1); // Reset page
@@ -1940,7 +1945,6 @@ const fetchCaseDetailsById = async (id) => {
               }}
             >
               <option value="">-Select Prioritization-</option>
-              <option value="NonCompliant2_Yes">OOC (NonCompliant - YES)</option>
               <option value="PreService">Pre-Service</option>
               <option value="PG_Yes">PG - YES</option>
               <option value="Admin">Admin</option>
@@ -1951,6 +1955,28 @@ const fetchCaseDetailsById = async (id) => {
               <option value="IFP">IFP</option>
             </select>
           </div>
+
+       {/* OOC (NonCompliant) Filter */}
+       <div style={{ width: 250 }}>
+        <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4}}>
+          Filter by OOC (NonCompliant):
+        </label>
+        <select
+          value={oocFilter}
+          onChange={(e) => setOocFilter(e.target.value)}
+          style={{
+            padding: 8,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            width: "100%",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="All">All</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
 
 
             {/* Page Size Selector */}

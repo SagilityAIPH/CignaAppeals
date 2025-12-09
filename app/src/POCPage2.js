@@ -111,6 +111,7 @@ function POCPage() {
   const [caseStatusFilter, setCaseStatusFilter] = useState("All");
   const [assignmentFilter, setAssignmentFilter] = useState("All");
   const [prioritizationFilter, setPrioritizationFilter] = useState("All");
+  const [oocFilter, setOocFilter] = useState("All");
   const [managerFilter, setManagerFilter] = useState("All");
   const [managerList, setManagerList] = useState([]);
   const [selectedManagers, setSelectedManagers] = useState([]);
@@ -601,10 +602,14 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     prioritization: ''
   };
 
+  // Handle OOC filter separately
+  if (oocFilter === 'Yes') {
+    prioritizationPayload.NonCompliant2 = 'YES';
+  } else if (oocFilter === 'No') {
+    prioritizationPayload.NonCompliant2 = 'NO';
+  }
+
   switch (prioritizationFilter) {
-    case 'NonCompliant2_Yes':
-      prioritizationPayload.NonCompliant2 = 'YES';
-      break;
     case 'PG_Yes':
       prioritizationPayload.PG = 'YES';
       break;
@@ -691,7 +696,7 @@ useEffect(() => {
   } else {
 
   }
-}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, managerFilter, selectedManagers, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
+}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, oocFilter, managerFilter, selectedManagers, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
 
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
@@ -889,6 +894,7 @@ const handleRefresh = async () => {
     setAssignmentFilter("All");
     setCaseStatusFilter("All");
     setPrioritizationFilter("");
+    setOocFilter("All");
     setManagerFilter("All");
     setSelectedManagers([]);
     setCurrentPage(1);
@@ -2245,7 +2251,6 @@ const caseStatusUpdate = async (status) => {
           }}
         >
           <option value="">-- Select Prioritization --</option>
-          <option value="NonCompliant2_Yes">OOC (NonCompliant - YES)</option>
           <option value="PreService">Pre-Service</option>
           <option value="PG_Yes">PG - YES</option>
           <option value="Admin">Admin</option>
@@ -2254,6 +2259,28 @@ const caseStatusUpdate = async (status) => {
           <option value="Fully Insured">Fully Insured</option>
           <option value="ASO">ASO</option>
           <option value="IFP">IFP</option>
+        </select>
+      </div>
+
+       {/* OOC (NonCompliant) Filter */}
+       <div style={{ width: 250 }}>
+        <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4}}>
+          Filter by OOC (NonCompliant):
+        </label>
+        <select
+          value={oocFilter}
+          onChange={(e) => setOocFilter(e.target.value)}
+          style={{
+            padding: 8,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            width: "100%",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="All">All</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
         </select>
       </div>
 
