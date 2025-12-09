@@ -956,6 +956,20 @@ const handleSendSummaryCountEmail = async () => {
 
 
 const handleExtractExcel = async () => {
+
+ // Validate 5-day limit
+ const start = new Date(fromDate);
+ const end = new Date(toDate);
+
+ // Calculate difference in days
+ const diffTime = end - start;
+ const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+ if (diffDays > 5) {
+   alert("You can only extract a maximum of 5 days at a time.");
+   return; // Stop execution
+ }
+
   try {
     const response = await axios.get(`${exportAPI}export_appeals`, {
        responseType: 'blob',
