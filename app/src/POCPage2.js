@@ -2321,24 +2321,6 @@ const caseStatusUpdate = async (status) => {
               <option disabled>No managers available</option>
             )}
           </select>
-          {selectedManagers.length > 0 && (
-            <button
-              onClick={() => setSelectedManagers([])}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 6,
-                border: "none",
-                backgroundColor: "#ff4d4f",
-                color: "white",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 600,
-                whiteSpace: "nowrap"
-              }}
-            >
-              Clear
-            </button>
-          )}
         </div>
         {selectedManagers.length > 0 && (
           <div style={{
@@ -2351,8 +2333,23 @@ const caseStatusUpdate = async (status) => {
             maxHeight: 100,
             overflowY: "auto"
           }}>
-            <div style={{ fontWeight: 600, marginBottom: 6, color: "#003b70" }}>
-              Selected Manager(s):
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 600, marginBottom: 6, color: "#003b70" }}>
+              <span>Selected Manager(s):</span>
+              <button
+                onClick={() => setSelectedManagers([])}
+                style={{
+                  backgroundColor: "#dc3545",
+                  color: "white",
+                  border: "none",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  fontWeight: "600"
+                }}
+              >
+                Clear
+              </button>
             </div>
             {selectedManagers.map((manager, idx) => (
               <div key={idx} style={{ 
