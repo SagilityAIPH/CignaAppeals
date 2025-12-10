@@ -2348,8 +2348,8 @@ const fetchCaseDetailsById = async (id) => {
                   padding: "6px 12px",
                   borderRadius: "6px",
                   border: "1px solid #ccc",
-                  backgroundColor: "#fff",
-                  color: "#0071ce",
+                  backgroundColor: "#0071ce",
+                  color: "white",
                   cursor: currentPage2 === 1 ? "not-allowed" : "pointer",
                   opacity: currentPage2 === 1 ? 0.6 : 1,
                 }}
@@ -2374,8 +2374,8 @@ const fetchCaseDetailsById = async (id) => {
                   padding: "6px 12px",
                   borderRadius: "6px",
                   border: "1px solid #ccc",
-                  backgroundColor: "#fff",
-                  color: "#0071ce",
+                  backgroundColor: "#0071ce",
+                  color: "white",
                   cursor:
                     currentPage2 >= totalPages2 ? "not-allowed" : "pointer",
                   opacity: currentPage2 >= totalPages2 ? 0.6 : 1,
@@ -2385,33 +2385,40 @@ const fetchCaseDetailsById = async (id) => {
               </button>
 
               {/* Page Size Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label
-                  htmlFor="pageSize"
-                  style={{
-                    fontWeight: "500",
-                    color: "#003b70"
-                  }}
-                >
-                  Rows per page:
-                </label>
-                <select
-                  id="pageSize"
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                  style={{
-                    padding: "8px",
-                    borderRadius: "6px",
-                    border: "1px solid #ccc",
-                    width: "65px",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '500', color: '#003b70' }}>
+                  Rows:
+                </span>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '4px',
+                  backgroundColor: '#f0f0f0',
+                  padding: '4px',
+                  borderRadius: '6px'
+                }}>
+                  {[10, 20, 50, 100].map(size => (
+                    <button
+                      key={size}
+                      onClick={() => {
+                        setPageSize(size);
+                        setCurrentPage2(1);
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '13px',
+                        fontWeight: pageSize === size ? '600' : '400',
+                        backgroundColor: pageSize === size ? '#0071ce' : 'transparent',
+                        color: pageSize === size ? 'white' : '#333',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

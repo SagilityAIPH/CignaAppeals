@@ -2840,42 +2840,41 @@ const caseStatusUpdate = async (status) => {
     </button>
 
     {/*Filter rows*/}
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-    <label
-      htmlFor="pageSize"
-      style={{
-        fontWeight: '500',
-        color: '#003b70'
-      }}
-    >
-      Rows per page:
-    </label>
-    <select
-      id="pageSize"
-      value={pageSize === 0 ? '' : pageSize}  // show '' if 0 means all
-      onChange={(e) => {
-        const val = e.target.value;
-        if (val === '') {
-          setPageSize(10);    // 0 means fetch all
-          setCurrentPage(1);
-        } else {
-          setPageSize(parseInt(val, 10));
-          setCurrentPage(1);
-        }
-      }}
-      style={{
-        padding: '8px',
-        borderRadius: '4px',
-        border: '1px solid #ccc',
-        fontFamily: 'inherit',
-        width: '65px'
-      }}
-    >
-      {[10, 20, 50, 100].map(size => (
-        <option key={size} value={size}>{size}</option>
-      ))}
-    </select>
-  </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <span style={{ fontSize: '13px', fontWeight: '500', color: '#003b70' }}>
+        Rows:
+      </span>
+      <div style={{ 
+        display: 'flex', 
+        gap: '4px',
+        backgroundColor: '#f0f0f0',
+        padding: '4px',
+        borderRadius: '6px'
+      }}>
+        {[10, 20, 50, 100].map(size => (
+          <button
+            key={size}
+            onClick={() => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+            style={{
+              padding: '6px 12px',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '13px',
+              fontWeight: pageSize === size ? '600' : '400',
+              backgroundColor: pageSize === size ? '#0071ce' : 'transparent',
+              color: pageSize === size ? 'white' : '#333',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {size}
+          </button>
+        ))}
+      </div>
+    </div>
 
   </div>
 </>
