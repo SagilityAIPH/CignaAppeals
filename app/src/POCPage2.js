@@ -110,11 +110,13 @@ function POCPage() {
   const [preserviceHeaders, setPreserviceHeaders] = useState([]);
   const [caseStatusFilter, setCaseStatusFilter] = useState("All");
   const [assignmentFilter, setAssignmentFilter] = useState("All");
-  const [prioritizationFilter, setPrioritizationFilter] = useState("All");
-  const [oocFilter, setOocFilter] = useState("All");
   const [managerFilter, setManagerFilter] = useState("All");
   const [managerList, setManagerList] = useState([]);
   const [selectedManagers, setSelectedManagers] = useState([]);
+  const [selectedAppealTypes, setSelectedAppealTypes] = useState([]);
+  const [tempSelectedAppealTypes, setTempSelectedAppealTypes] = useState([]);
+  const [showAppealTypeDropdown, setShowAppealTypeDropdown] = useState(false);
+  const [prioritizationFilter, setPrioritizationFilter] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedRow, setSelectedRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -261,6 +263,7 @@ let caseTblAllColumnMap = {
   system: "System",
   lpi: "LPI",
   pg: "PG",
+  product: "Product",
   nonCompliant2: "Non-Compliant 2", 
   appeal_Category: "Appeal Category",
   pG_NAME: "PG Name",
@@ -595,48 +598,17 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
     }
   }
 
-  // Map selected prioritization value to backend params
-  let prioritizationPayload = {
-    NonCompliant2: '',
-    PG: '',
-    prioritization: ''
-  };
-
-  // Handle OOC filter separately
-  if (oocFilter === 'Yes') {
-    prioritizationPayload.NonCompliant2 = 'YES';
-  } else if (oocFilter === 'No') {
-    prioritizationPayload.NonCompliant2 = 'NO';
-  }
-
-  switch (prioritizationFilter) {
-    case 'PG_Yes':
-      prioritizationPayload.PG = 'YES';
-      break;
-    case 'PreService':
-      prioritizationPayload.prioritization = 'Pre-Service';
-      break;
-      case 'Admin':
-        prioritizationPayload.prioritization = 'Admin';
-        break;
-      case 'Medical':
-        prioritizationPayload.prioritization = 'Medical';
-        break;
-     case 'Member':
-        prioritizationPayload.prioritization = 'Member';
-        break;
-     case 'ASO':
-        prioritizationPayload.prioritization = 'ASO';
-        break;
-      case 'Fully Insured':
-        prioritizationPayload.prioritization = 'Fully Insured';
-        break;
-     case 'IFP':
-        prioritizationPayload.prioritization = 'IFP';
-        break;
-    default:
-      break;
-  }
+  // Map selected appeal types to prioritization_Multiselect array
+  const prioritization_Multiselect = selectedAppealTypes.map(type => {
+    // Map internal values to backend expected values
+    if (type === 'PG_Yes') return 'PG-YES';
+    if (type === 'PG_No') return 'PG-NO';
+    if (type === 'NonCompliant2_Yes') return 'NonCompliant2-Yes';
+    if (type === 'NonCompliant2_No') return 'NonCompliant2-No';
+    if (type === 'PreService') return 'Pre-Service';
+    if (type === 'Fully Insured') return 'Fully Insured';
+    return type; // Admin, Medical, Member, ASO, IFP, Provider remain same
+  });
 
   // Determine endpoint based on active tab
     let endpoint = "cases_tbl_all_poc";
@@ -657,7 +629,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       claim_system: claimSystemParam,
       account: accountParam,
       manager: selectedManagers.length > 0 ? selectedManagers : (managerFilter === 'All' ? [] : [managerFilter]),
-      ...prioritizationPayload
+      prioritization_Multiselect: prioritization_Multiselect
     };
     
     const res = await axios.post(
@@ -693,10 +665,11 @@ useEffect(() => {
     fetchAgeBuckets();
     fetchCaseStatusCt();
     fetchManagers();
+
   } else {
 
   }
-}, [account, caseStatusFilter, assignmentFilter, prioritizationFilter, oocFilter, managerFilter, selectedManagers, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
+}, [account, caseStatusFilter, assignmentFilter, managerFilter, selectedManagers, selectedAppealTypes, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
 
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
@@ -704,7 +677,7 @@ useEffect(() => {
    
     fetchCasesPage(currentPage, pageSize);
   }
-}, [account, currentPage, pageSize, claimSystemParam, accountParam]); // Include account
+}, [account, currentPage, pageSize, claimSystemParam, accountParam, selectedAppealTypes]); // Include account
 
 const location = useLocation();
 
@@ -729,7 +702,7 @@ useEffect(() => {
   } else {
    
   }
-}, [account, claimSystemParam, accountParam, pageSize]); // Include account as dependency
+}, [account, claimSystemParam, accountParam, pageSize, selectedAppealTypes]); // Include account as dependency
 
 // Set default dropdown values based on user account
 useEffect(() => {
@@ -865,12 +838,25 @@ const fetchCaseStatusCt = async () => {
     }
   }
 
+  // Map selected appeal types to prioritization array
+  const prioritization_Multiselect = selectedAppealTypes.map(type => {
+    if (type === 'PG_Yes') return 'PG-YES';
+    if (type === 'PG_No') return 'PG-NO';
+    if (type === 'NonCompliant2_Yes') return 'NonCompliant2-Yes';
+    if (type === 'NonCompliant2_No') return 'NonCompliant2-No';
+    if (type === 'PreService') return 'Pre-Service';
+    if (type === 'Fully Insured') return 'Fully Insured';
+    return type;
+  });
+
   try {
-    const params = { claim_system: claimSystemParam, account: accountParam };
+    const params = { 
+      claim_system: claimSystemParam, 
+      account: accountParam,
+      prioritization_Multiselect: prioritization_Multiselect
+    };
     
-    const res = await axios.get(`${dataApiUrl}get_cases_status_ct_poc`, {
-      params: params
-    });
+    const res = await axios.post(`${dataApiUrl}get_cases_status_ct_poc`, params);
 
     if (res.data) {
       setCaseStatusCt(res.data);
@@ -893,10 +879,9 @@ const handleRefresh = async () => {
     // Reset all state to initial values
     setAssignmentFilter("All");
     setCaseStatusFilter("All");
-    setPrioritizationFilter("");
-    setOocFilter("All");
     setManagerFilter("All");
     setSelectedManagers([]);
+    setSelectedAppealTypes([]);
     setCurrentPage(1);
     setPageSize(10);
     setSelectedRows([]);
@@ -1036,12 +1021,25 @@ const fetchAgeBuckets = async () => {
     }
   }
 
+  // Map selected appeal types to prioritization array
+  const prioritization_Multiselect = selectedAppealTypes.map(type => {
+    if (type === 'PG_Yes') return 'PG-YES';
+    if (type === 'PG_No') return 'PG-NO';
+    if (type === 'NonCompliant2_Yes') return 'NonCompliant2-Yes';
+    if (type === 'NonCompliant2_No') return 'NonCompliant2-No';
+    if (type === 'PreService') return 'Pre-Service';
+    if (type === 'Fully Insured') return 'Fully Insured';
+    return type;
+  });
+
   try {
-    const params = { claim_system: claimSystemParam, account: accountParam };
+    const params = { 
+      claim_system: claimSystemParam, 
+      account: accountParam,
+      prioritization_Multiselect: prioritization_Multiselect
+    };
     
-    const res = await axios.get(`${dataApiUrl}get_age_bucket_poc`, {
-      params: params
-    });
+    const res = await axios.post(`${dataApiUrl}get_age_bucket_poc`, params);
     
     const data = res.data || [];
 
@@ -1744,6 +1742,222 @@ const caseStatusUpdate = async (status) => {
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleFileSelect} />
         </div>
 
+        {/* Appeal Type Filter Section */}
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: 12, 
+          flexWrap: "wrap", 
+          backgroundColor: "white", 
+          padding: "16px 24px", 
+          borderRadius: 10, 
+          marginBottom: 20, 
+          maxWidth: 1500, 
+          marginInline: "auto", 
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)" 
+        }}>
+          <label style={{ fontWeight: 600 }}>Choose Appeal Type:</label>
+          
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => {
+                setShowAppealTypeDropdown(!showAppealTypeDropdown);
+                if (!showAppealTypeDropdown) {
+                  setTempSelectedAppealTypes([...selectedAppealTypes]);
+                }
+              }}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: "1px solid #ccc",
+                fontSize: 14,
+                backgroundColor: "white",
+                cursor: "pointer",
+                textAlign: "left",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <span>{selectedAppealTypes.length > 0 ? `${selectedAppealTypes.length} selected` : "All"}</span>
+              <span style={{ marginLeft: 8 }}>▼</span>
+            </button>
+            
+            {showAppealTypeDropdown && (
+              <div style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                marginTop: 4,
+                backgroundColor: "white",
+                border: "1px solid #ccc",
+                borderRadius: 6,
+                boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+                zIndex: 1000,
+                minWidth: 200,
+                padding: "8px 0"
+              }}>
+                {["All", "Admin", "ASO", "Fully Insured", "IFP", "Medical", "Member", "NonCompliant2-No", "NonCompliant2-Yes", "PG-No", "PG-Yes", "PreService", "Provider"].map((type) => (
+                  <label
+                    key={type}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      backgroundColor: type === "All" ? (tempSelectedAppealTypes.length === 0 ? "#f0f8ff" : "transparent") : (tempSelectedAppealTypes.includes(type) ? "#f0f8ff" : "transparent")
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = type === "All" ? (tempSelectedAppealTypes.length === 0 ? "#f0f8ff" : "transparent") : (tempSelectedAppealTypes.includes(type) ? "#f0f8ff" : "transparent")}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={type === "All" ? tempSelectedAppealTypes.length === 0 : tempSelectedAppealTypes.includes(type)}
+                      onChange={(e) => {
+                        if (type === "All") {
+                          setTempSelectedAppealTypes([]);
+                        } else {
+                          if (e.target.checked) {
+                            setTempSelectedAppealTypes([...tempSelectedAppealTypes, type]);
+                          } else {
+                            setTempSelectedAppealTypes(tempSelectedAppealTypes.filter(t => t !== type));
+                          }
+                        }
+                      }}
+                      style={{ marginRight: 8, cursor: "pointer" }}
+                    />
+                    {type === "PG_Yes" ? "PG-YES" : 
+                     type === "PG_No" ? "PG-NO" : 
+                     type === "PreService" ? "Pre-Service" : 
+                     type === "NonCompliant2_Yes" ? "NonCompliant2-Yes" : 
+                     type === "NonCompliant2_No" ? "NonCompliant2-No" : 
+                     type === "Fully Insured" ? "Fully Insured" : 
+                     type}
+                  </label>
+                ))}
+                
+                <div style={{
+                  borderTop: "1px solid #eee",
+                  marginTop: 8,
+                  paddingTop: 8,
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 8,
+                  padding: "8px 12px"
+                }}>
+                  <button
+                    onClick={() => {
+                      setSelectedAppealTypes([...tempSelectedAppealTypes]);
+                      setShowAppealTypeDropdown(false);
+                    }}
+                    style={{
+                      backgroundColor: "#0071ce",
+                      color: "white",
+                      border: "none",
+                      padding: "6px 16px",
+                      borderRadius: 4,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Select
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTempSelectedAppealTypes([]);
+                      setSelectedAppealTypes([]);
+                      setShowAppealTypeDropdown(false);
+                    }}
+                    style={{
+                      backgroundColor: "#dc3545",
+                      color: "white",
+                      border: "none",
+                      padding: "6px 16px",
+                      borderRadius: 4,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {selectedAppealTypes.length > 0 && (
+            <div style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              alignItems: "center"
+            }}>
+              <span style={{ fontSize: 13, color: "#666", marginRight: 4 }}>Selected:</span>
+              {selectedAppealTypes.map((type, idx) => (
+                <span
+                  key={idx}
+                  style={{
+                    backgroundColor: "#e8f0fe",
+                    color: "#003b70",
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6
+                  }}
+                >
+                  {type === "PG_Yes" ? "PG-YES" : 
+                   type === "PG_No" ? "PG-NO" : 
+                   type === "PreService" ? "Pre-Service" : 
+                   type === "NonCompliant2_Yes" ? "NonCompliant2-Yes" : 
+                   type === "NonCompliant2_No" ? "NonCompliant2-No" : 
+                   type === "Fully Insured" ? "Fully Insured" : 
+                   type}
+                  <button
+                    onClick={() => setSelectedAppealTypes(selectedAppealTypes.filter((_, i) => i !== idx))}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#ff4d4f",
+                      cursor: "pointer",
+                      fontSize: 16,
+                      fontWeight: "bold",
+                      padding: 0,
+                      lineHeight: 1
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <button
+                onClick={() => {
+                  setSelectedAppealTypes([]);
+                  setTempSelectedAppealTypes([]);
+                }}
+                style={{
+                  backgroundColor: "#dc3545",
+                  color: "white",
+                  border: "none",
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  marginLeft: 8
+                }}
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+        </div>
+
         {selectedFileName && (
           <div style={{ marginTop: 12, marginInline: "auto", maxWidth: 1500, backgroundColor: "white", padding: 20, borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
             <div style={{ marginBottom: 8, fontWeight: 600 }}>{selectedFileName}</div>
@@ -2245,56 +2459,6 @@ const caseStatusUpdate = async (status) => {
           <option value="">All</option>
           <option value="Assigned">Assigned</option>
           <option value="Unassigned">Unassigned</option>
-        </select>
-      </div>
-
-       {/* Prioritization Filter */}
-       <div style={{ width: 200 }}>
-        <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4 }}>
-          Filter by Prioritization:
-        </label>
-        <select
-          value={prioritizationFilter}
-          onChange={(e) => setPrioritizationFilter(e.target.value)}
-          style={{
-            padding: 8,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-            width: "100%",
-            fontFamily: "inherit",
-          }}
-        >
-          <option value="">-- Select Prioritization --</option>
-          <option value="PreService">Pre-Service</option>
-          <option value="PG_Yes">PG - YES</option>
-          <option value="Admin">Admin</option>
-          <option value="Medical">Medical</option>
-          <option value="Member">Member</option>
-          <option value="Fully Insured">Fully Insured</option>
-          <option value="ASO">ASO</option>
-          <option value="IFP">IFP</option>
-        </select>
-      </div>
-
-       {/* OOC (NonCompliant) Filter */}
-       <div style={{ width: 250 }}>
-        <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4}}>
-          Filter by OOC (NonCompliant):
-        </label>
-        <select
-          value={oocFilter}
-          onChange={(e) => setOocFilter(e.target.value)}
-          style={{
-            padding: 8,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-            width: "100%",
-            fontFamily: "inherit",
-          }}
-        >
-          <option value="All">All</option>
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
         </select>
       </div>
 
