@@ -1640,7 +1640,7 @@ const caseStatusUpdate = async (status) => {
       <main style={{ marginTop: 60, marginLeft: 220, padding: 24, minHeight: "calc(100vh - 60px)", backgroundColor: "#f9f9fb", fontFamily: "'Lexend', sans-serif" }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between",  backgroundColor: "white", padding: 24, borderRadius: 10, marginBottom: 30, maxWidth: 1500, marginInline: "auto", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <label htmlFor="reportSelect" style={{ fontWeight: 600 }}>Choose report:</label>
+            <label htmlFor="reportSelect" style={{ fontWeight: 600 }}>Choose Platform:</label>
             <select 
               id="reportSelect" 
               value={selectedReport} 
@@ -2007,7 +2007,7 @@ const caseStatusUpdate = async (status) => {
                               <div style={{ display: "flex", flexWrap: "wrap", columnGap: "5%", rowGap: "12px" }}>
                                 {/* Left column */}
                                 <div style={{ flex: "1 1 45%" }}>
-                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>Case Summary</div>
+                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>📋 Appeals Summary</div>
                                   <div>📁 Total Cases: <strong>{total}</strong></div>
                                   <div>🚀 Assigned: <strong>{assigned}</strong></div>
                                    <div>🆕 New Assigned: <strong>{newAssigned}</strong></div>
@@ -2023,7 +2023,7 @@ const caseStatusUpdate = async (status) => {
 
                                 {/* Right column */}
                                 <div style={{ flex: "1 1 45%" }}>
-                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🔴 Non-Compliant(Yes) Cases</div>
+                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🔴 Non-Compliant(Yes) Appeals</div>
                                    <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
                                   {/* <div>📂 Pend: <strong>{open_NonCompliant}</strong></div> */}
                                     <div>🚀 Assigned: <strong>{assigned_NonCompliant}</strong></div>
@@ -2037,7 +2037,7 @@ const caseStatusUpdate = async (status) => {
                                 </div>
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
-                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟦 Pre-Service Cases</div>
+                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟦 Pre-Service Appeals</div>
                                    <div>📊 Total Pre-Service: <strong>{total_PreService}</strong></div>
                                      <div>🚀 Assigned: <strong>{assigned_PreService}</strong></div>
                                   <div>🆕 New Assigned: <strong>{newAssigned_PreService}</strong></div>
@@ -2050,7 +2050,7 @@ const caseStatusUpdate = async (status) => {
                                 </div>
 
                                 <div style={{ flex: "1 1 45%", marginTop: "12px" }}>
-                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟩 PG(Yes) Cases</div>
+                                  <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "6px" }}>🟩 PG(Yes) Appeals</div>
                                   <div>📊 Total PG: <strong>{total_PG_Yes}</strong></div>
                                      <div>🚀 Assigned: <strong>{assigned_PG}</strong></div>
                                   <div>❔ Unassigned: <strong>{unassigned_PG}</strong></div>

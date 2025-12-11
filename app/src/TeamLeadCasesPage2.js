@@ -1485,7 +1485,9 @@ const fetchCaseDetailsById = async (id) => {
 
                         total_NonCompliant_Yes,
                         total_PreService,
-                        total_PG_Yes
+                        total_PG_Yes,
+                        pG_NonCompliant_Ct,
+                        preService_NonCompliant_Ct
                       } = caseStatusCt;
 
                       const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -1494,7 +1496,7 @@ const fetchCaseDetailsById = async (id) => {
                         <div style={{ display: "flex", flexWrap: "wrap", columnGap: "5%", rowGap: "16px" }}>
                           {/* Left Column */}
                           <div style={{ flex: "1 1 45%" }}>
-                            <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "8px" }}>Case Summary</div>
+                            <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "8px" }}>📋 Appeals Summary</div>
                             <div>📁 Total Cases: <strong>{total}</strong></div>
                             <div>🚀 Assigned: <strong>{assigned}</strong></div>
                             <div>❔ Unassigned: <strong>{unassigned}</strong></div>
@@ -1503,8 +1505,10 @@ const fetchCaseDetailsById = async (id) => {
                             {/* <div>📂 Open/Pend: <strong>{open}</strong></div> */}
                             <div>✅ Completed: <strong>{completed}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent}</strong></div>
+                            <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
 
-                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px", marginBottom: "8px" }}>🟦 Pre-Service Cases</div>
+
+                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px", marginBottom: "8px" }}>🟦 Pre-Service Appeals</div>
                             {/* <div>📂 Open/Pend: <strong>{open_PreService}</strong></div> */}
                              <div>📊 Total Pre-Service: <strong>{total_PreService}</strong></div>
                                <div>🚀 Assigned: <strong>{assigned_PreService}</strong></div>
@@ -1513,12 +1517,12 @@ const fetchCaseDetailsById = async (id) => {
                             <div>🟡 Pended: <strong>{pended_PreService}</strong></div>
                             <div>✅ Completed: <strong>{completed_PreService}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_PreService}</strong></div>
-                          
+                            <div>📊 Total Pre-Service Non-Compliant: <strong>{preService_NonCompliant_Ct}</strong></div>
                           </div>
 
                           {/* Right Column */}
                           <div style={{ flex: "1 1 45%" }}>
-                            <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "8px" }}>🔴 Non-Compliant(Yes) Cases</div>
+                            <div style={{ fontWeight: "600", color: "#003b70", marginBottom: "8px" }}>🔴 Non-Compliant(Yes) Appeals</div>
                             {/* <div>📂 Open/Pend: <strong>{open_NonCompliant}</strong></div> */}
                               <div>📊 Total Non-Compliant: <strong>{total_NonCompliant_Yes}</strong></div>
                                <div>🚀 Assigned: <strong>{assigned_NonCompliant}</strong></div>
@@ -1530,7 +1534,7 @@ const fetchCaseDetailsById = async (id) => {
                            
                             
 
-                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px", marginBottom: "8px" }}>🟩 PG(Yes) Cases</div>
+                            <div style={{ fontWeight: "600", color: "#003b70", marginTop: "16px", marginBottom: "8px" }}>🟩 PG(Yes) Appeals</div>
                             {/* <div>📂 Open/Pend: <strong>{open_PG}</strong></div> */}
                             <div>📊 Total PG: <strong>{total_PG_Yes}</strong></div>
                              <div>🚀 Assigned: <strong>{assigned_PG}</strong></div>
@@ -1539,6 +1543,7 @@ const fetchCaseDetailsById = async (id) => {
                             <div>🟡 Pended: <strong>{pended_PG}</strong></div>
                             <div>✅ Completed: <strong>{completed_PG}</strong></div>
                             <div>🔔 FFup Sent: <strong>{fFup_Sent_PG}</strong></div>
+                            <div>📊 Total PG Non-Compliant: <strong>{pG_NonCompliant_Ct}</strong></div>
                           </div>
 
                           {/* Full-Width Completion Rate */}
