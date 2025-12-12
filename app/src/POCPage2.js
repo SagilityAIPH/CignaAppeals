@@ -110,6 +110,7 @@ function POCPage() {
   const [preserviceHeaders, setPreserviceHeaders] = useState([]);
   const [caseStatusFilter, setCaseStatusFilter] = useState("All");
   const [assignmentFilter, setAssignmentFilter] = useState("All");
+  const [oocFilter, setOocFilter] = useState("All");
   const [managerFilter, setManagerFilter] = useState("All");
   const [managerList, setManagerList] = useState([]);
   const [selectedManagers, setSelectedManagers] = useState([]);
@@ -602,9 +603,7 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
   const prioritization_Multiselect = selectedAppealTypes.map(type => {
     // Map internal values to backend expected values
     if (type === 'PG_Yes') return 'PG-YES';
-    if (type === 'PG_No') return 'PG-NO';
     if (type === 'NonCompliant2_Yes') return 'NonCompliant2-Yes';
-    if (type === 'NonCompliant2_No') return 'NonCompliant2-No';
     if (type === 'PreService') return 'Pre-Service';
     if (type === 'Fully Insured') return 'Fully Insured';
     return type; // Admin, Medical, Member, ASO, IFP, Provider remain same
@@ -629,7 +628,8 @@ const fetchCasesPage = async (page = currentPage, size = pageSize) => {
       claim_system: claimSystemParam,
       account: accountParam,
       manager: selectedManagers.length > 0 ? selectedManagers : (managerFilter === 'All' ? [] : [managerFilter]),
-      prioritization_Multiselect: prioritization_Multiselect
+      prioritization_Multiselect: prioritization_Multiselect,
+      nonCompliant2: oocFilter === 'Yes' ? 'YES' : oocFilter === 'No' ? 'NO' : ''
     };
     
     const res = await axios.post(
@@ -669,7 +669,7 @@ useEffect(() => {
   } else {
 
   }
-}, [account, caseStatusFilter, assignmentFilter, managerFilter, selectedManagers, selectedAppealTypes, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
+}, [account, caseStatusFilter, assignmentFilter, oocFilter, managerFilter, selectedManagers, selectedAppealTypes, claimSystemParam, accountParam, pageSize, activeAppealCasesTab]); // Include account
 
 useEffect(() => {
   // Only fetch data if we have an account (to ensure proper filtering)
@@ -841,9 +841,7 @@ const fetchCaseStatusCt = async () => {
   // Map selected appeal types to prioritization array
   const prioritization_Multiselect = selectedAppealTypes.map(type => {
     if (type === 'PG_Yes') return 'PG-YES';
-    if (type === 'PG_No') return 'PG-NO';
     if (type === 'NonCompliant2_Yes') return 'NonCompliant2-Yes';
-    if (type === 'NonCompliant2_No') return 'NonCompliant2-No';
     if (type === 'PreService') return 'Pre-Service';
     if (type === 'Fully Insured') return 'Fully Insured';
     return type;
@@ -1024,9 +1022,7 @@ const fetchAgeBuckets = async () => {
   // Map selected appeal types to prioritization array
   const prioritization_Multiselect = selectedAppealTypes.map(type => {
     if (type === 'PG_Yes') return 'PG-YES';
-    if (type === 'PG_No') return 'PG-NO';
     if (type === 'NonCompliant2_Yes') return 'NonCompliant2-Yes';
-    if (type === 'NonCompliant2_No') return 'NonCompliant2-No';
     if (type === 'PreService') return 'Pre-Service';
     if (type === 'Fully Insured') return 'Fully Insured';
     return type;
@@ -1797,7 +1793,7 @@ const caseStatusUpdate = async (status) => {
                 minWidth: 200,
                 padding: "8px 0"
               }}>
-                {["All", "Admin", "ASO", "Fully Insured", "IFP", "Medical", "Member", "NonCompliant2-No", "NonCompliant2-Yes", "PG-No", "PG-Yes", "PreService", "Provider"].map((type) => (
+                {["All", "Admin", "ASO", "Fully Insured", "IFP", "Medical", "Member", "NonCompliant2-Yes", "PG-Yes", "PreService", "Provider"].map((type) => (
                   <label
                     key={type}
                     style={{
@@ -1828,10 +1824,8 @@ const caseStatusUpdate = async (status) => {
                       style={{ marginRight: 8, cursor: "pointer" }}
                     />
                     {type === "PG_Yes" ? "PG-YES" : 
-                     type === "PG_No" ? "PG-NO" : 
                      type === "PreService" ? "Pre-Service" : 
                      type === "NonCompliant2_Yes" ? "NonCompliant2-Yes" : 
-                     type === "NonCompliant2_No" ? "NonCompliant2-No" : 
                      type === "Fully Insured" ? "Fully Insured" : 
                      type}
                   </label>
@@ -1912,10 +1906,8 @@ const caseStatusUpdate = async (status) => {
                   }}
                 >
                   {type === "PG_Yes" ? "PG-YES" : 
-                   type === "PG_No" ? "PG-NO" : 
                    type === "PreService" ? "Pre-Service" : 
                    type === "NonCompliant2_Yes" ? "NonCompliant2-Yes" : 
-                   type === "NonCompliant2_No" ? "NonCompliant2-No" : 
                    type === "Fully Insured" ? "Fully Insured" : 
                    type}
                   <button
@@ -2459,6 +2451,28 @@ const caseStatusUpdate = async (status) => {
           <option value="">All</option>
           <option value="Assigned">Assigned</option>
           <option value="Unassigned">Unassigned</option>
+        </select>
+      </div>
+
+      {/* OOC (NonCompliant) Filter */}
+      <div style={{ width: 250 }}>
+        <label style={{ fontWeight: "500", color: "#003b70", display: "block", marginBottom: 4 }}>
+          Filter by OOC (NonCompliant):
+        </label>
+        <select
+          value={oocFilter}
+          onChange={(e) => setOocFilter(e.target.value)}
+          style={{
+            padding: 8,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            width: "100%",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="All">All</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
         </select>
       </div>
 
