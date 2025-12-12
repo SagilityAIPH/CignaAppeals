@@ -2809,8 +2809,9 @@ const caseStatusUpdate = async (status) => {
                   color:
                     (excelKey === 'appealStatus' && row.appealStatus.includes("Completed"))
                       ? "green"
-                      : (excelKey === 't_Minus' || excelKey === 't_Minus') &&
-                    row.appealStatus === 'Pended'
+                      : (excelKey === 'appealStatus' && row.appealStatus === 'Pended')
+                      ? "red"
+                      : (excelKey === 't_Minus') && row.appealStatus === 'Pended'
                       ? 'red'
                       : 'inherit',
                   fontWeight:
