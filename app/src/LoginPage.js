@@ -221,9 +221,10 @@ function LoginPage() {
               style={{
                 width: '100%',
                 padding: '10px',
-                margin: '10px 0 20px',
+                margin: '0 0 20px 0',
                 borderRadius: '6px',
                 border: '1px solid #ccc',
+                boxSizing: 'border-box',
               }}
             />
 
@@ -239,6 +240,7 @@ function LoginPage() {
                 marginBottom: '30px',
                 borderRadius: '6px',
                 border: '1px solid #ccc',
+                boxSizing: 'border-box',
               }}
             />
 
@@ -255,7 +257,8 @@ function LoginPage() {
                 fontWeight: 'bold',
                 fontSize: '16px',
                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'background 0.3s ease'
+                transition: 'background 0.3s ease',
+                boxSizing: 'border-box',
               }}
               onMouseOver={(e) => !isLoading && (e.target.style.backgroundColor = '#76a938')}
               onMouseOut={(e) => !isLoading && (e.target.style.backgroundColor = '#8BC53F')}

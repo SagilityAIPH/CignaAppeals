@@ -952,7 +952,7 @@ const ownedRows = preserviceRows.filter(
       fontSize: '19px',
       fontWeight: '500',
       color: '#003b70',
-      marginBottom: '10px',
+      marginBottom: '16px',
       marginTop: '0px'
     }}>
       Appeal Cases
@@ -1104,7 +1104,8 @@ const ownedRows = preserviceRows.filter(
         borderRadius: '6px',
         border: '1px solid #ccc',
         width: '100%',
-        fontFamily: 'inherit'
+        fontFamily: 'inherit',
+        marginBottom : '16px',
       }}
     >
       <option value="All">All</option>
@@ -1145,7 +1146,7 @@ const ownedRows = preserviceRows.filter(
     </select>
   </div> */}
 
-  {/* Rows Per Page */}
+  {/* Rows Per Page
   <div style={{ display: 'flex', flexDirection: 'column', width: '150px' }}>
     <label
       htmlFor="pageSize"
@@ -1180,7 +1181,8 @@ const ownedRows = preserviceRows.filter(
       ))}
 </select>
 
-  </div>
+  </div> */}
+
 </div>
 
 
@@ -1343,8 +1345,6 @@ const ownedRows = preserviceRows.filter(
         padding: '6px 12px',
         borderRadius: '6px',
         border: '1px solid #ccc',
-        backgroundColor: '#fff',
-        color: '#0071ce',
         cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
       }}
     >
@@ -1364,13 +1364,48 @@ const ownedRows = preserviceRows.filter(
         padding: '6px 12px',
         borderRadius: '6px',
         border: '1px solid #ccc',
-        backgroundColor: '#fff',
-        color: '#0071ce',
         cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
       }}
     >
       Next
     </button>
+
+    {/* Rows per page - Button Style */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <span style={{ fontSize: '13px', fontWeight: '500', color: '#003b70' }}>
+        Rows:
+      </span>
+      <div style={{ 
+        display: 'flex', 
+        gap: '4px',
+        backgroundColor: '#f0f0f0',
+        padding: '4px',
+        borderRadius: '6px'
+      }}>
+        {[10, 30, 50].map(size => (
+          <button
+            key={size}
+            onClick={() => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+            style={{
+              padding: '6px 12px',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '13px',
+              fontWeight: pageSize === size ? '600' : '400',
+              backgroundColor: pageSize === size ? '#0071ce' : 'transparent',
+              color: pageSize === size ? 'white' : '#333',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {size}
+          </button>
+        ))}
+      </div>
+    </div>
   </div>
 
 </div>

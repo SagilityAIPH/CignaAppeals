@@ -122,9 +122,10 @@ const handleLogin = (e) => {
               style={{
                 width: '100%',
                 padding: '10px',
-                margin: '10px 0 20px',
+                margin: '0 0 20px 0',
                 borderRadius: '6px',
                 border: '1px solid #ccc',
+                boxSizing: 'border-box',
               }}
             />
 
@@ -140,6 +141,7 @@ const handleLogin = (e) => {
                 marginBottom: '30px',
                 borderRadius: '6px',
                 border: '1px solid #ccc',
+                boxSizing: 'border-box',
               }}
             />
 
@@ -155,7 +157,8 @@ const handleLogin = (e) => {
                 fontWeight: 'bold',
                 fontSize: '16px',
                 cursor: 'pointer',
-                transition: 'background 0.3s ease'
+                transition: 'background 0.3s ease',
+                boxSizing: 'border-box',
               }}
               onMouseOver={(e) => e.target.style.backgroundColor = '#76a938'}
               onMouseOut={(e) => e.target.style.backgroundColor = '#8BC53F'}
