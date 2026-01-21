@@ -148,7 +148,11 @@ const handleNavClick = (path, itemKey) => {
       {/* Main content area */}
       <main
         className="main-content"
-        style={{ marginLeft: "250px", marginTop: "60px", padding: "20px" }}
+        style={{
+          marginLeft: "250px", 
+          marginTop: "10px", 
+          padding: "20px",
+        }}
       >
         <Outlet /> {/* 👈 Page-specific content will be rendered here */}
       </main>

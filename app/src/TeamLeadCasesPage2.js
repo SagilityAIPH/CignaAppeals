@@ -1376,6 +1376,7 @@ const fetchCaseDetailsById = async (id) => {
                   border: "1px solid #ddd",
                   maxHeight: "300px",
                   overflow: "auto",
+                  borderRadius: "8px",
                 }}
               >
                 <table
@@ -2041,10 +2042,10 @@ const fetchCaseDetailsById = async (id) => {
               justifyContent: "space-between",
               alignItems: "center",
               backgroundColor: "#e8f0fe",
-              border: "1px solid #c4d4ec",
+              // border: "1px solid #c4d4ec",
               borderRadius: "8px",
               padding: "16px",
-              marginBottom: "16px",
+              marginBottom: "10px",
               marginTop: "0px",
               boxShadow: "0 4px 8px rgba(0,0,0,0.05)",
               gap: "20px",
@@ -2137,22 +2138,6 @@ const fetchCaseDetailsById = async (id) => {
               >
                 Mark as Completed
               </button> */}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: "16px", width: "100%" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-end",
-                gap: "16px", // space between selects
-                flexWrap: "wrap", // allows wrapping on smaller screens
-              }}
-            >
-              {/* Status Filter */}
-              
-
-            
             </div>
           </div>
 

@@ -521,7 +521,12 @@ console.log("Available Keys:", Object.keys(fixedData[0]));
       {/* Left Section: Table + Card */}
       <div style={{ flex: 1, minWidth: '450px', maxWidth: '650px' }}>
         {/* Scrollable Table */}
-        <div style={{ border: '1px solid #ddd', maxHeight: '300px', overflow: 'auto' }}>
+        <div style={{ 
+          border: '1px solid #ddd', 
+          maxHeight: '300px', 
+          overflow: 'auto',
+          borderRadius: '8px' 
+          }}>
           <table
             style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}
           >
